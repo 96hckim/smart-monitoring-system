@@ -1,8 +1,5 @@
 #include "device_driver.h"
-#include "ws2812b.h"
 #include <stdio.h>
-
-volatile unsigned char TIM2_Timeout_Flag = 0;
 
 void _Invalid_ISR(void)
 {
@@ -11,40 +8,6 @@ void _Invalid_ISR(void)
 	printf("Invalid_ISR: %d!\n", r - 16);
 	for (;;)
 		;
-}
-
-// TIM2 ISR
-void TIM2_IRQHandler(void)
-{
-	Macro_Clear_Bit(TIM2->SR, 0U);
-	NVIC_ClearPendingIRQ(TIM2_IRQn);
-
-	TIM2_Timeout_Flag = 1; // 타임아웃 플래그 Set
-}
-
-// 인터럽트에서 1.25us마다 순차적으로 출력할 1D 전송 버퍼 (RET 40개 + 96비트 = 136개)
-extern unsigned short ccr_buffer[TOTAL_BITS];
-
-extern volatile unsigned short tx_idx;
-extern volatile unsigned char is_busy;
-
-void TIM3_IRQHandler(void)
-{
-	if (Macro_Check_Bit_Set(TIM3->SR, 0U))
-	{
-		Macro_Clear_Bit(TIM3->SR, 0U);
-
-		if (tx_idx < TOTAL_BITS)
-		{
-			TIM3->CCR2 = ccr_buffer[tx_idx++]; // TIM3->CCR2 로 전송!
-		}
-		else
-		{
-			Macro_Clear_Bit(TIM3->DIER, 0U); // UIE = 0 (인터럽트 종료)
-			TIM3->CCR2 = WS2812_DUTY_RET;
-			is_busy = 0;
-		}
-	}
 }
 
 extern volatile unsigned long Sys_Tick;
@@ -58,38 +21,13 @@ void TIM4_IRQHandler(void)
 	Sys_Tick++; // 1ms 시스템 틱 증가
 }
 
-volatile int DMA2_STREAM0_DONE = 0;
-
-void DMA2_Stream0_IRQHandler(void)
-{
-	DMA2->LIFCR = 0x3F << 0;
-	NVIC_ClearPendingIRQ(DMA2_Stream0_IRQn);
-	DMA2_STREAM0_DONE = 1;
-}
-
-volatile int DMA1_STREAM6_DONE = 0;
-
-void DMA1_Stream6_IRQHandler(void)
-{
-	DMA1->HIFCR = 0x3F << 16;
-	NVIC_ClearPendingIRQ(DMA1_Stream6_IRQn);
-	DMA1_STREAM6_DONE = 1;
-}
-
-volatile unsigned char DMA1_STREAM5_DONE = 1;
-
-void DMA1_Stream5_IRQHandler(void)
-{
-	DMA1->HIFCR = (0x3FU << 6U);
-	Macro_Clear_Bit(TIM2->DIER, 9U);
-	DMA1_STREAM5_DONE = 1;
-}
+#define RX_BUF_SIZE 32
 
 volatile unsigned char rx_cmd = '0';
 volatile unsigned char rx_flag = 0;
 
 void USART2_IRQHandler(void)
 {
-	rx_flag = 1;
 	rx_cmd = (unsigned char)(USART2->DR & 0xFF);
+	rx_flag = 1;
 }
