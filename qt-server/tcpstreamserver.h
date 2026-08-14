@@ -7,6 +7,9 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 
+/**
+ * @brief 안드로이드 클라이언트와의 영상 스트리밍 및 원격 제어 명령 중계를 담당하는 TCP 서버 클래스
+ */
 class TcpStreamServer : public QObject {
     Q_OBJECT
 public:
@@ -15,8 +18,6 @@ public:
 
     bool startServer(quint16 port);
     void stopServer();
-
-    // ⭐ 안드로이드 클라이언트로 가스 수치를 쏴주는 중계 함수 (추후 연동용)
     void sendGasDataToClient(int adcValue, int threshold);
 
 signals:

@@ -6,49 +6,43 @@
 #include <stdio.h>
 
 extern volatile unsigned long Sys_Tick;
-extern volatile unsigned char rx_cmd;  // Qt로부터 수신받은 명령어 ('1': 차단, '0': 복구)
-extern volatile unsigned char rx_flag; // 명령어 수신 플래그
+extern volatile unsigned char rx_cmd;  // Qt 수신 명령 ('1': 차단, '0': 복구)
+extern volatile unsigned char rx_flag; // 명령 수신 플래그
 
-// 시스템 밸브 상태 (0: 정상/개방, 1: 위험/차단)
-static unsigned char g_valve_state = 0;
+static unsigned char g_valve_state = 0; // 밸브 상태 (1: 차단/환기, 0: 정상/개방)
 
-// ----------------------------------------------------
-// ⭐ 밸브 상태 제어 함수 (LED + 모터 환풍기 동시 제어)
-// ----------------------------------------------------
+// 밸브 상태 변경 및 하드웨어 액추에이터(LED + 모터) 동기화
 static void Valve_Set_State(unsigned char state)
 {
     g_valve_state = state;
-
-    // 1: LED ON + 모터 회전 (차단/환기)
-    // 0: LED OFF + 모터 정지 (정상/복구)
     Barrier_LED_Display(state);
     Motor_Display(state);
 }
 
-// ----------------------------------------------------
-// Qt 명령어 수신 처리
-// ----------------------------------------------------
+// 수신된 Qt 명령어 디코딩 처리
 static void Process_Command(unsigned char cmd)
 {
     if (cmd == '1')
     {
-        Valve_Set_State(1); // 차단 및 환기팬 가동
+        Valve_Set_State(1);
     }
     else if (cmd == '0')
     {
-        Valve_Set_State(0); // 복구 및 환기팬 정지
+        Valve_Set_State(0);
     }
 }
 
 static void Sys_Init(int baud)
 {
+    // FPU(Coprocessor CP10, CP11) Full Access 활성화
     SCB->CPACR |= (0x3 << 10 * 2) | (0x3 << 11 * 2);
+
     Clock_Init();
     Uart2_Init(baud);
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    Barrier_LED_Init(); // LED 초기화 (PB0, PB1)
-    Motor_Init();       // 모터 초기화 (PB4, PB5)
+    Barrier_LED_Init(); // PB0, PB1 차단벽 LED 초기화
+    Motor_Init();       // PC0, PC1 L298N 모터 초기화
 }
 
 void Main(void)
@@ -60,24 +54,24 @@ void Main(void)
     printf("\n=== Smart Monitoring System ===\n");
 
     TIM4_Init();
-    ADC1_Init(); // 가변저항 ADC (PA6)
+    ADC1_Init();
     Uart2_RX_Interrupt_Enable(1);
 
-    // 초기 상태: 정상 (LED OFF, 모터 OFF)
+    // 초기 상태: 정상 개방 (LED 소등, 모터 정지)
     Valve_Set_State(0);
 
     printf("System Ready!\n");
 
     for (;;)
     {
-        // 1. Qt 원격 제어 명령 수신
+        // 1. Qt 원격 제어 명령 비동기 처리
         if (rx_flag)
         {
             Process_Command(rx_cmd);
             rx_flag = 0;
         }
 
-        // 2. 100ms 주기로 가변저항 센서값 Qt 전송
+        // 2. Non-blocking 100ms 주기로 가스 센서 데이터 전송
         if ((Sys_Tick - cur_tick) < 100)
             continue;
 

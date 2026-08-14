@@ -1,6 +1,5 @@
 ﻿#include "serialmanager.h"
 #include "logger.h"
-#include <QDebug>
 
 SerialManager::SerialManager(QObject* parent)
     : QObject(parent)
@@ -40,26 +39,25 @@ bool SerialManager::connectPort(const QString& portName, qint32 baudRate)
 
     if (m_serialPort->open(QIODevice::ReadWrite)) {
         m_serialPort->clear();
-
         emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Info,
-                               QString("포트 연결 성공: %1 (%2 bps)").arg(portName).arg(baudRate)),
+                               QString("시리얼 포트 연결 성공: %1 (%2 bps)").arg(portName).arg(baudRate)),
             false);
         emit connectionStateChanged(true);
         return true;
-    } else {
-        emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Error,
-                               QString("포트 연결 실패: %1 (%2)").arg(portName).arg(m_serialPort->errorString())),
-            true);
-        emit connectionStateChanged(false);
-        return false;
     }
+
+    emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Error,
+                           QString("시리얼 포트 연결 실패: %1 (%2)").arg(portName).arg(m_serialPort->errorString())),
+        true);
+    emit connectionStateChanged(false);
+    return false;
 }
 
 void SerialManager::disconnectPort()
 {
     if (m_serialPort->isOpen()) {
         m_serialPort->close();
-        emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Info, "시리얼 포트 연결이 해제되었습니다."), false);
+        emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Info, "시리얼 포트 연결 해제됨"), false);
         emit connectionStateChanged(false);
     }
 }
@@ -74,8 +72,7 @@ bool SerialManager::sendCommand(const QString& cmd)
     if (!m_serialPort->isOpen())
         return false;
 
-    qint64 bytesWritten = m_serialPort->write(cmd.toUtf8());
-    return bytesWritten != -1;
+    return m_serialPort->write(cmd.toUtf8()) != -1;
 }
 
 bool SerialManager::sendChar(char cmd)
@@ -83,10 +80,10 @@ bool SerialManager::sendChar(char cmd)
     if (!m_serialPort->isOpen())
         return false;
 
-    qint64 bytesWritten = m_serialPort->write(&cmd, 1);
-    return bytesWritten != -1;
+    return m_serialPort->write(&cmd, 1) != -1;
 }
 
+// 개행 문자 단위 데이터 파싱 및 유효 범위(0~4095) 검증
 void SerialManager::onReadyRead()
 {
     while (m_serialPort->canReadLine()) {
@@ -110,7 +107,7 @@ void SerialManager::onReadyRead()
 void SerialManager::onErrorOccurred(QSerialPort::SerialPortError error)
 {
     if (error == QSerialPort::ResourceError) {
-        emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Error, "장치가 강제로 연결 해제되었습니다."), true);
+        emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Error, "장치 연결이 예기치 않게 끊어졌습니다."), true);
         disconnectPort();
     }
 }

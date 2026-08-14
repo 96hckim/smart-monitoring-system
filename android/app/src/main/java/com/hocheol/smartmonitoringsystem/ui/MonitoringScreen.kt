@@ -52,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +76,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hocheol.smartmonitoringsystem.util.ImageUtils
 import java.util.concurrent.Executors
 
+/**
+ * 스마트 모니터링 시스템의 메인 컴포저블 화면 (카메라 뷰, 연결 패널, 원격 제어, 시스템 로그)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
@@ -108,10 +112,19 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
     ) { isGranted -> hasCameraPermission = isGranted }
 
     LaunchedEffect(Unit) {
-        if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+        if (!hasCameraPermission) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
     }
 
+    // 카메라 프레임 분석기 전용 단일 스레드 풀 (화면 종료 시 안전하게 셧다운)
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+        }
+    }
+
     val previewView = remember { PreviewView(context) }
 
     LaunchedEffect(hasCameraPermission, cameraSelector, isFlashEnabled) {
@@ -128,7 +141,7 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
                     .build()
 
                 imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                    if (viewModel.isConnected.value && viewModel.isStreaming.value) {
+                    if (isConnected && isStreaming) {
                         val jpegBytes = ImageUtils.imageProxyToJpeg(imageProxy)
                         if (jpegBytes != null) {
                             viewModel.sendVideoFrame(jpegBytes)
@@ -163,7 +176,7 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
                             .padding(end = 8.dp)
                     ) {
                         Text(
-                            "🛡️ Gas Shield",
+                            "Smart Monitoring Shield",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -241,6 +254,7 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
                 logs = logs,
                 onClearLogs = viewModel::clearLogs
             )
+
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -262,9 +276,7 @@ fun CameraSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                alpha = 0.5f
-            )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
@@ -278,7 +290,6 @@ fun CameraSection(
                 if (hasPermission) {
                     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
 
-                    // Overlays
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -316,14 +327,12 @@ fun CameraSection(
                 }
             }
 
-            // Quick Actions Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Streaming Button
                 Button(
                     onClick = onToggleStreaming,
                     modifier = Modifier
@@ -395,9 +404,7 @@ fun ConnectionSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                alpha = 0.3f
-            )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         )
     ) {
         Column(
@@ -416,7 +423,6 @@ fun ConnectionSection(
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                // Smaller Connect Button
                 Button(
                     onClick = onToggleConnection,
                     modifier = Modifier.height(36.dp),
@@ -484,9 +490,7 @@ fun GasControlSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                alpha = 0.3f
-            )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         )
     ) {
         Column(
@@ -617,7 +621,7 @@ fun LogSection(
             ) {
                 if (logs.isEmpty()) {
                     Text(
-                        "No logs available.",
+                        "기록된 로그가 없습니다.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

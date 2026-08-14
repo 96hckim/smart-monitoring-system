@@ -8,18 +8,14 @@ import com.hocheol.smartmonitoringsystem.ui.MonitoringScreen
 import com.hocheol.smartmonitoringsystem.ui.theme.SmartMonitoringSystemTheme
 
 /**
- * 앱의 메인 진입점 Activity
+ * 스마트 모니터링 시스템 안드로이드 클라이언트의 메인 Activity
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Edge-to-Edge 디자인 적용
         enableEdgeToEdge()
-
         setContent {
             SmartMonitoringSystemTheme {
-                // UI 메인 스크린 호출
                 MonitoringScreen()
             }
         }

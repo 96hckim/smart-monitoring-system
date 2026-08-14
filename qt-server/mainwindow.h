@@ -21,6 +21,9 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+/**
+ * @brief 스마트 모니터링 시스템의 메인 GUI 컨트롤러
+ */
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
@@ -29,14 +32,14 @@ public:
     ~MainWindow();
 
 private slots:
-    // --- [1. TCP 서버 & 영상 수신 슬롯] ---
+    // TCP 스트리밍 & 원격 제어 슬롯
     void on_btnStartServer_clicked();
     void onFrameReceived(const QPixmap& pixmap);
     void onClientCountChanged(int count);
     void onLogMessage(const QString& message);
-    void onValveCommandFromClient(char cmd); // 안드로이드 원격 제어 수신
+    void onValveCommandFromClient(char cmd);
 
-    // --- [2. 시리얼 통신 슬롯] ---
+    // 시리얼 통신 & 밸브 제어 슬롯
     void on_btnSerialConnect_clicked();
     void on_btnValveClose_clicked();
     void on_btnValveOpen_clicked();
@@ -44,12 +47,10 @@ private slots:
     void onSerialStatusMessage(const QString& msg, bool isError);
     void onSerialConnectionChanged(bool isConnected);
 
-    // --- [3. 임계값 설정 슬롯] ---
+    // 임계값 및 파일 로깅 슬롯
     void on_btnApplyThreshold_clicked();
-
-    // --- [4. CSV 파일 저장 및 경로 관리 슬롯] ---
-    void on_btnSelectPath_clicked(); // [경로 선택] 버튼 (QFileDialog)
-    void on_btnOpenFolder_clicked(); // [폴더 열기] 버튼 (탐색기)
+    void on_btnSelectPath_clicked();
+    void on_btnOpenFolder_clicked();
 
 private:
     QString getLocalIPAddress();
@@ -58,12 +59,13 @@ private:
 
 private:
     Ui::MainWindow* ui;
-    TcpStreamServer* m_streamServer; // TCP 스트리밍 서버 모듈
-    SerialManager* m_serialManager; // 시리얼 통신 전담 모듈
-    ChartManager* m_chartManager; // 차트 매니저
+    TcpStreamServer* m_streamServer;
+    SerialManager* m_serialManager;
+    ChartManager* m_chartManager;
 
-    int m_currentThreshold = 3000; // 현재 적용된 위험 임계값
-    QString m_saveDirPath = "./logs"; // 기본 로그 저장 경로
+    int m_currentThreshold = 3000;
+    QString m_saveDirPath = "./logs";
+    bool m_isValveClosed = false; // 밸브 중복 제어 방지 래치 플래그
 };
 
 #endif // MAINWINDOW_H

@@ -13,7 +13,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * UI 상태 관리 및 네트워크 엔진 연동을 담당하는 ViewModel
+ * 스마트 모니터링 시스템의 UI 상태 관리 및 네트워크 명령을 조율하는 ViewModel
  */
 class MonitoringViewModel : ViewModel() {
 
@@ -31,7 +31,7 @@ class MonitoringViewModel : ViewModel() {
     private val _isStreaming = MutableStateFlow(false)
     val isStreaming = _isStreaming.asStateFlow()
 
-    private val _cameraSelector = MutableStateFlow(0) // 0: Back, 1: Front
+    private val _cameraSelector = MutableStateFlow(0) // 0: 후면 카메라, 1: 전면 카메라
     val cameraSelector = _cameraSelector.asStateFlow()
 
     private val _isFlashEnabled = MutableStateFlow(false)
@@ -56,7 +56,7 @@ class MonitoringViewModel : ViewModel() {
                 when (event) {
                     is SocketEvent.Connected -> {
                         _isConnected.value = true
-                        addLog("서버 연결 성공: ${event.ip}:${event.port}")
+                        addLog("서버 연결 성공 (${event.ip}:${event.port})")
                     }
 
                     is SocketEvent.Disconnected -> {
@@ -82,15 +82,12 @@ class MonitoringViewModel : ViewModel() {
         }
     }
 
+    // 서버 중계 가스 데이터 파싱 (포맷: GAS:수치:임계값)
     private fun parseGasData(text: String) {
-        try {
-            val parts = text.split(":")
-            if (parts.size >= 3) {
-                _gasValue.value = parts[1].toIntOrNull() ?: 0
-                _threshold.value = parts[2].toIntOrNull() ?: 3000
-            }
-        } catch (e: Exception) {
-            // 파싱 오류 무시
+        val parts = text.split(":")
+        if (parts.size >= 3) {
+            _gasValue.value = parts[1].toIntOrNull() ?: _gasValue.value
+            _threshold.value = parts[2].toIntOrNull() ?: _threshold.value
         }
     }
 
@@ -118,7 +115,7 @@ class MonitoringViewModel : ViewModel() {
             return
         }
         _isStreaming.value = !_isStreaming.value
-        addLog(if (_isStreaming.value) "스트리밍 시작" else "스트리밍 중지")
+        addLog(if (_isStreaming.value) "비디오 스트리밍 시작" else "비디오 스트리밍 중지")
     }
 
     fun toggleCamera() {
@@ -133,16 +130,12 @@ class MonitoringViewModel : ViewModel() {
 
     fun sendValveClose() {
         socketClient.sendText("1")
-        addLog("명령 송신: 1 (밸브 차단)")
+        addLog("명령 송신: 밸브 차단 ('1')")
     }
 
     fun sendValveOpen() {
         socketClient.sendText("0")
-        addLog("명령 송신: 0 (밸브 복구)")
-    }
-
-    fun clearLogs() {
-        _logs.value = emptyList()
+        addLog("명령 송신: 밸브 복구 ('0')")
     }
 
     fun sendVideoFrame(data: ByteArray) {
@@ -151,10 +144,15 @@ class MonitoringViewModel : ViewModel() {
         }
     }
 
+    fun clearLogs() {
+        _logs.value = emptyList()
+    }
+
+    // 슬라이딩 윈도우 방식으로 최대 100개 로그 유지
     private fun addLog(text: String) {
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         val formattedLog = "[$timestamp] $text"
-        _logs.update { it + formattedLog }
+        _logs.update { (it + formattedLog).takeLast(100) }
     }
 
     override fun onCleared() {

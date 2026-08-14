@@ -22,11 +22,11 @@ bool TcpStreamServer::startServer(quint16 port)
         emit logMessage(Logger::format(LogCategory::TCP, LogLevel::Info,
             QString("서버가 포트 %1에서 시작되었습니다.").arg(port)));
         return true;
-    } else {
-        emit logMessage(Logger::format(LogCategory::TCP, LogLevel::Error,
-            QString("서버 시작 실패: %1").arg(m_server->errorString())));
-        return false;
     }
+
+    emit logMessage(Logger::format(LogCategory::TCP, LogLevel::Error,
+        QString("서버 시작 실패: %1").arg(m_server->errorString())));
+    return false;
 }
 
 void TcpStreamServer::stopServer()
@@ -35,19 +35,21 @@ void TcpStreamServer::stopServer()
         m_clientSocket->abort();
         m_clientSocket->deleteLater();
         m_clientSocket = nullptr;
-
         emit clientCountChanged(0);
     }
+
+    m_buffer.clear();
+    m_imageSize = 0;
+
     if (m_server->isListening()) {
         m_server->close();
     }
 }
 
-// ⭐ 연결된 안드로이드 클라이언트로 가스 수치 데이터를 쏴주는 로직
+// 클라이언트로 실시간 가스 데이터 및 임계값 중계 (포맷: GAS:수치:임계값\n)
 void TcpStreamServer::sendGasDataToClient(int adcValue, int threshold)
 {
     if (m_clientSocket && m_clientSocket->isOpen()) {
-        // 포맷: GAS:수치:임계값\n
         QString dataStr = QString("GAS:%1:%2\n").arg(adcValue).arg(threshold);
         m_clientSocket->write(dataStr.toUtf8());
     }
@@ -63,20 +65,18 @@ void TcpStreamServer::onNewConnection()
     }
 
     m_clientSocket = m_server->nextPendingConnection();
-
     connect(m_clientSocket, &QTcpSocket::readyRead, this, &TcpStreamServer::onReadyRead);
     connect(m_clientSocket, &QTcpSocket::disconnected, this, &TcpStreamServer::onClientDisconnected);
 
     m_buffer.clear();
     m_imageSize = 0;
 
-    QString clientIp = m_clientSocket->peerAddress().toString();
     emit logMessage(Logger::format(LogCategory::TCP, LogLevel::Info,
-        QString("새 클라이언트가 연결되었습니다. (%1)").arg(clientIp)));
-
+        QString("클라이언트 연결됨 (%1)").arg(m_clientSocket->peerAddress().toString())));
     emit clientCountChanged(1);
 }
 
+// 가변 길이 바이너리(JPEG) 및 텍스트 제어 명령 분기 수신
 void TcpStreamServer::onReadyRead()
 {
     QTcpSocket* socket = qobject_cast<QTcpSocket*>(sender());
@@ -86,16 +86,10 @@ void TcpStreamServer::onReadyRead()
     m_buffer.append(socket->readAll());
 
     while (!m_buffer.isEmpty()) {
-
-        // =========================================================
-        // [1단계] 아직 헤더를 안 읽은 새 패킷 시작점일 때 (m_imageSize == 0)
-        // =========================================================
         if (m_imageSize == 0) {
-
-            // A. 텍스트 명령어 처리 ('1', '0' 등 첫 바이트가 0x00이 아닌 경우)
+            // 텍스트 제어 명령 처리 ('1': 차단, '0': 복구)
             if (static_cast<unsigned char>(m_buffer[0]) != 0x00) {
                 int newlineIdx = m_buffer.indexOf('\n');
-
                 if (newlineIdx != -1) {
                     QByteArray lineBytes = m_buffer.left(newlineIdx).trimmed();
                     m_buffer.remove(0, newlineIdx + 1);
@@ -109,16 +103,14 @@ void TcpStreamServer::onReadyRead()
                     m_buffer.remove(0, 1);
                     emit valveCommandReceived(cmdChar);
                 } else {
-                    // 개행문자(\n)가 다 올 때까지 대기
                     break;
                 }
-                continue; // 다음 루프로 이동
+                continue;
             }
 
-            // B. 비디오 프레임 헤더 읽기 (첫 바이트가 0x00인 바이너리 길이)
-            if (m_buffer.size() < static_cast<int>(sizeof(qint32))) {
-                break; // 4바이트 헤더가 다 쌓일 때까지 대기
-            }
+            // 비디오 프레임 4바이트 헤더(Big-Endian 페이로드 길이) 파싱
+            if (m_buffer.size() < static_cast<int>(sizeof(qint32)))
+                break;
 
             QDataStream stream(m_buffer.left(sizeof(qint32)));
             stream.setByteOrder(QDataStream::BigEndian);
@@ -126,21 +118,19 @@ void TcpStreamServer::onReadyRead()
 
             m_buffer.remove(0, sizeof(qint32));
 
+            // 비정상 패킷 크기 방어 로직 (최대 10MB)
             if (m_imageSize <= 0 || m_imageSize > 10 * 1024 * 1024) {
                 emit logMessage(Logger::format(LogCategory::TCP, LogLevel::Warn,
-                    QString("손상된 패킷 감지 (%1 바이트). 버퍼를 비웁니다.").arg(m_imageSize)));
+                    QString("비정상 패킷 감지 (%1 Bytes). 버퍼를 초기화합니다.").arg(m_imageSize)));
                 m_buffer.clear();
                 m_imageSize = 0;
                 return;
             }
         }
 
-        // =========================================================
-        // [2단계] 비디오 프레임 바디(JPEG) 수신 (m_imageSize > 0)
-        // =========================================================
-        if (m_buffer.size() < m_imageSize) {
-            break; // 전체 이미지 데이터가 다 올 때까지 대기
-        }
+        // 이미지 바이너리 페이로드 수신
+        if (m_buffer.size() < m_imageSize)
+            break;
 
         QByteArray jpegData = m_buffer.left(m_imageSize);
         m_buffer.remove(0, m_imageSize);
@@ -150,21 +140,19 @@ void TcpStreamServer::onReadyRead()
             emit frameReceived(pixmap);
         }
 
-        m_imageSize = 0; // 프레임 완료 후 초기화
+        m_imageSize = 0;
     }
 }
 
 void TcpStreamServer::onClientDisconnected()
 {
     QTcpSocket* socket = qobject_cast<QTcpSocket*>(sender());
-
     emit logMessage(Logger::format(LogCategory::TCP, LogLevel::Info, "클라이언트 연결이 해제되었습니다."));
 
     if (socket && socket == m_clientSocket) {
         m_clientSocket = nullptr;
         m_buffer.clear();
         m_imageSize = 0;
-
         emit clientCountChanged(0);
     }
 

@@ -7,7 +7,7 @@ TARGET			= arm-none-eabi
 OUT_FILE_NAME 	= rom_0x08000000
 LDS_FILE_NAME	= rom_0x08000000.lds
 
-# Compiler & Linker Option, Cortex-M3 & No FPU
+# Compiler & Linker Option: Cortex-M4 with Hardware FPU (FPv4-SP-D16 Hard-ABI)
 CFLAGS  		= -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F411xE 
 CFLAGS 			+= -std=gnu99 -O3 -Wall -g -c -fno-builtin -funsigned-char -fno-strict-aliasing -fno-common
 LDFLAGS 		= -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
@@ -60,5 +60,5 @@ clean :
 	rm -f $(OBJS)
 	rm -f $(DUMP)
 
-run: # for STM32CubeProgrammer
-	STM32_Programmer_CLI.exe -c port=SWD -w ./rom_0x08000000.elf -v -rst -q	
+run:
+	STM32_Programmer_CLI.exe -c port=SWD -w ./rom_0x08000000.elf -v -rst -q

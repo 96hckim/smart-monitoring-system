@@ -4,14 +4,18 @@
 #include <QDateTime>
 #include <QString>
 
-// 1. 통신/모듈 카테고리 열거형
+/**
+ * @brief 시스템 로깅 카테고리 분류
+ */
 enum class LogCategory {
     TCP,
     Serial,
     System
 };
 
-// 2. 로그 상태 레벨 열거형
+/**
+ * @brief 로그 심각도 및 송수신 상태 레벨
+ */
 enum class LogLevel {
     Info,
     Warn,
@@ -20,9 +24,18 @@ enum class LogLevel {
     Rx
 };
 
+/**
+ * @brief 시스템 전역 로그 메시지 포맷팅을 담당하는 유틸리티 클래스
+ */
 class Logger {
 public:
-    // ⭐ 메인 로깅 함수 (단하나의 대표 함수)
+    // 정적 유틸리티 클래스로 인스턴스화 방지
+    Logger() = delete;
+
+    /**
+     * @brief 타임스탬프와 카테고리, 로그 레벨이 포함된 표준 로그 문자열 생성
+     * @return [hh:mm:ss] [CATEGORY] [LEVEL] 메시지 형태의 포맷 문자열
+     */
     static QString format(LogCategory category, LogLevel level, const QString& message)
     {
         QString timeStr = QDateTime::currentDateTime().toString("hh:mm:ss");
@@ -33,15 +46,16 @@ public:
             .arg(message);
     }
 
-    // ⭐ 카테고리를 생략하면 System으로 처리하는 오버로딩 함수
+    /**
+     * @brief 기본 System 카테고리로 로그 문자열을 생성하는 오버로딩 함수
+     */
     static QString format(LogLevel level, const QString& message)
     {
         return format(LogCategory::System, level, message);
     }
 
 private:
-    // Enum ➔ QString 변환 헬퍼 함수
-    static QString categoryToString(LogCategory category)
+    static const char* categoryToString(LogCategory category)
     {
         switch (category) {
         case LogCategory::TCP:
@@ -54,7 +68,7 @@ private:
         return "UNKNOWN";
     }
 
-    static QString levelToString(LogLevel level)
+    static const char* levelToString(LogLevel level)
     {
         switch (level) {
         case LogLevel::Info:

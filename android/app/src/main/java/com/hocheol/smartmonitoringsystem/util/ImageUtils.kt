@@ -10,13 +10,16 @@ import androidx.camera.core.ImageProxy
 import java.io.ByteArrayOutputStream
 
 /**
- * 카메라 프레임 처리를 위한 유틸리티 클래스
+ * CameraX ImageProxy 프레임을 네트워크 전송용 JPEG 바이너리로 변환하는 유틸리티 객체
  */
 object ImageUtils {
 
     /**
-     * CameraX의 [ImageProxy]를 JPEG 바이트 배열로 변환합니다.
-     * 센서의 회전 각도([ImageProxy.getImageInfo.getRotationDegrees])를 자동으로 반영합니다.
+     * YUV_420_888 포맷의 ImageProxy를 압축 및 회전 보정된 JPEG 바이트 배열로 변환
+     *
+     * @param imageProxy CameraX 분석기에서 전달된 프레임 객체
+     * @param quality JPEG 압축 품질 (0 ~ 100)
+     * @return 압축된 JPEG 바이트 배열 (변환 실패 시 null)
      */
     fun imageProxyToJpeg(imageProxy: ImageProxy, quality: Int = 50): ByteArray? {
         if (imageProxy.format != ImageFormat.YUV_420_888) return null
@@ -29,8 +32,8 @@ object ImageUtils {
         val uSize = uBuffer.remaining()
         val vSize = vBuffer.remaining()
 
+        // NV21 포맷 버퍼 구성 (Y + V + U)
         val nv21 = ByteArray(ySize + uSize + vSize)
-
         yBuffer.get(nv21, 0, ySize)
         vBuffer.get(nv21, ySize, vSize)
         uBuffer.get(nv21, ySize + vSize, uSize)
@@ -43,12 +46,11 @@ object ImageUtils {
         val rotation = imageProxy.imageInfo.rotationDegrees
         if (rotation == 0) return imageBytes
 
-        // 회전 처리
-        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        // 센서 회전 각도 보정
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) ?: return null
         val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-        val rotatedBitmap = Bitmap.createBitmap(
-            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
-        )
+        val rotatedBitmap =
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 
         val rotatedOut = ByteArrayOutputStream()
         rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, quality, rotatedOut)
