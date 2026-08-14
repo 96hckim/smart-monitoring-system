@@ -34,7 +34,7 @@ void ChartManager::initChart(QChartView* chartView)
     // [2. 시리즈 스타일링 (선 색상 및 형태)]
     // ----------------------------------------------------
     // ① 가스 수치 실선 (파란색, 두께 2)
-    m_gasSeries->setName("가스 수치 (ADC)");
+    m_gasSeries->setName("가스 수치");
     QPen gasPen(QColor(0, 122, 255));
     gasPen.setWidth(2);
     m_gasSeries->setPen(gasPen);
@@ -57,7 +57,7 @@ void ChartManager::initChart(QChartView* chartView)
     m_axisX->setTitleText("샘플 번호");
 
     m_axisY->setRange(0, 4095); // 12-bit ADC 범위 (0 ~ 4095)
-    m_axisY->setTitleText("ADC Value");
+    m_axisY->setTitleText("Gas Value");
 
     m_chart->addAxis(m_axisX, Qt::AlignBottom);
     m_chart->addAxis(m_axisY, Qt::AlignLeft);

@@ -6,8 +6,6 @@ volatile unsigned long Sys_Tick = 0; // 시스템 틱 카운터
 // 타이머 모듈 전체 초기화
 void Timer_Init(void)
 {
-	TIM2_Init();
-	TIM3_Init();
 	TIM4_Init();
 	TIM5_Init();
 }

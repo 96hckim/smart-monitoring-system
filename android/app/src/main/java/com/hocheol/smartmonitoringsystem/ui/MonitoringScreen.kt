@@ -5,11 +5,13 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +21,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -83,11 +85,14 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
     val port by viewModel.port.collectAsStateWithLifecycle()
     val isConnected by viewModel.isConnected.collectAsStateWithLifecycle()
     val isStreaming by viewModel.isStreaming.collectAsStateWithLifecycle()
-    val cameraSelector by viewModel.cameraSelector.collectAsStateWithLifecycle()
+    val cameraSelectorIndex by viewModel.cameraSelector.collectAsStateWithLifecycle()
     val isFlashEnabled by viewModel.isFlashEnabled.collectAsStateWithLifecycle()
     val gasValue by viewModel.gasValue.collectAsStateWithLifecycle()
     val threshold by viewModel.threshold.collectAsStateWithLifecycle()
     val logs by viewModel.logs.collectAsStateWithLifecycle()
+
+    val cameraSelector =
+        if (cameraSelectorIndex == 0) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -232,7 +237,10 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
                 onValveOpen = viewModel::sendValveOpen
             )
 
-            LogSection(logs = logs)
+            LogSection(
+                logs = logs,
+                onClearLogs = viewModel::clearLogs
+            )
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -315,7 +323,7 @@ fun CameraSection(
                     .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Streaming Button (Moved here to not block the screen)
+                // Streaming Button
                 Button(
                     onClick = onToggleStreaming,
                     modifier = Modifier
@@ -487,7 +495,7 @@ fun GasControlSection(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom, // Align baseline
+                verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
@@ -520,7 +528,7 @@ fun GasControlSection(
                         Text(
                             text = if (isDanger) "DANGER" else "NORMAL",
                             color = Color.White,
-                            style = MaterialTheme.typography.labelMedium, // Slightly smaller
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
@@ -536,27 +544,27 @@ fun GasControlSection(
                     onClick = onValveClose,
                     modifier = Modifier
                         .weight(1f)
-                        .height(40.dp), // Smaller height
+                        .height(40.dp),
                     enabled = isConnected,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(Icons.Default.Lock, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("밸브 차단", style = MaterialTheme.typography.labelMedium)
+                    Text("밸브 차단", style = MaterialTheme.typography.labelLarge)
                 }
                 Button(
                     onClick = onValveOpen,
                     modifier = Modifier
                         .weight(1f)
-                        .height(40.dp), // Smaller height
+                        .height(40.dp),
                     enabled = isConnected,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(Icons.Default.LockOpen, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("밸브 복구", style = MaterialTheme.typography.labelMedium)
+                    Text("밸브 복구", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
@@ -564,19 +572,38 @@ fun GasControlSection(
 }
 
 @Composable
-fun LogSection(logs: List<String>) {
+fun LogSection(
+    logs: List<String>,
+    onClearLogs: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            "System Logs",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "System Logs",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                "Clear",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline
+                ),
+                modifier = Modifier.clickable { onClearLogs() }
+            )
+        }
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             shape = RoundedCornerShape(16.dp),
@@ -585,7 +612,8 @@ fun LogSection(logs: List<String>) {
             Column(
                 modifier = Modifier
                     .padding(12.dp)
-                    .heightIn(min = 60.dp, max = 120.dp)
+                    .height(160.dp)
+                    .verticalScroll(scrollState)
             ) {
                 if (logs.isEmpty()) {
                     Text(

@@ -1,6 +1,5 @@
 package com.hocheol.smartmonitoringsystem.ui
 
-import androidx.camera.core.CameraSelector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hocheol.smartmonitoringsystem.network.TcpSocketClient
@@ -32,7 +31,7 @@ class MonitoringViewModel : ViewModel() {
     private val _isStreaming = MutableStateFlow(false)
     val isStreaming = _isStreaming.asStateFlow()
 
-    private val _cameraSelector = MutableStateFlow(CameraSelector.DEFAULT_BACK_CAMERA)
+    private val _cameraSelector = MutableStateFlow(0) // 0: Back, 1: Front
     val cameraSelector = _cameraSelector.asStateFlow()
 
     private val _isFlashEnabled = MutableStateFlow(false)
@@ -57,13 +56,13 @@ class MonitoringViewModel : ViewModel() {
                 when (event) {
                     is SocketEvent.Connected -> {
                         _isConnected.value = true
-                        addLog("서버에 연결되었습니다: ${event.ip}:${event.port}")
+                        addLog("서버 연결 성공: ${event.ip}:${event.port}")
                     }
 
                     is SocketEvent.Disconnected -> {
                         _isConnected.value = false
                         _isStreaming.value = false
-                        addLog(event.message ?: "연결이 해제되었습니다.")
+                        addLog(event.message ?: "서버 연결 해제됨")
                     }
 
                     is SocketEvent.MessageReceived -> {
@@ -85,16 +84,13 @@ class MonitoringViewModel : ViewModel() {
 
     private fun parseGasData(text: String) {
         try {
-            // 포맷: "GAS:<수치>:<임계값>"
             val parts = text.split(":")
             if (parts.size >= 3) {
-                val value = parts[1].toIntOrNull() ?: 0
-                val thresh = parts[2].toIntOrNull() ?: 3000
-                _gasValue.value = value
-                _threshold.value = thresh
+                _gasValue.value = parts[1].toIntOrNull() ?: 0
+                _threshold.value = parts[2].toIntOrNull() ?: 3000
             }
         } catch (e: Exception) {
-            addLog("데이터 파싱 오류: $text")
+            // 파싱 오류 무시
         }
     }
 
@@ -112,22 +108,22 @@ class MonitoringViewModel : ViewModel() {
         } else {
             val portInt = _port.value.toIntOrNull() ?: 8080
             socketClient.connect(_ip.value, portInt)
-            addLog("연결 시도 중: ${_ip.value}:${portInt}")
+            addLog("서버 연결 시도 중...")
         }
     }
 
     fun toggleStreaming() {
+        if (!_isConnected.value) {
+            addLog("먼저 서버에 연결해 주세요.")
+            return
+        }
         _isStreaming.value = !_isStreaming.value
         addLog(if (_isStreaming.value) "스트리밍 시작" else "스트리밍 중지")
     }
 
     fun toggleCamera() {
-        _cameraSelector.value = if (_cameraSelector.value == CameraSelector.DEFAULT_BACK_CAMERA) {
-            CameraSelector.DEFAULT_FRONT_CAMERA
-        } else {
-            CameraSelector.DEFAULT_BACK_CAMERA
-        }
-        addLog("카메라 전환: ${if (_cameraSelector.value == CameraSelector.DEFAULT_BACK_CAMERA) "후면" else "전면"}")
+        _cameraSelector.value = if (_cameraSelector.value == 0) 1 else 0
+        addLog("카메라 전환: ${if (_cameraSelector.value == 0) "후면" else "전면"}")
     }
 
     fun toggleFlash() {
@@ -137,12 +133,16 @@ class MonitoringViewModel : ViewModel() {
 
     fun sendValveClose() {
         socketClient.sendText("1")
-        addLog("송신: 1 (밸브 차단)")
+        addLog("명령 송신: 1 (밸브 차단)")
     }
 
     fun sendValveOpen() {
         socketClient.sendText("0")
-        addLog("송신: 0 (밸브 복구)")
+        addLog("명령 송신: 0 (밸브 복구)")
+    }
+
+    fun clearLogs() {
+        _logs.value = emptyList()
     }
 
     fun sendVideoFrame(data: ByteArray) {
