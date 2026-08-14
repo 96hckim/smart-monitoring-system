@@ -153,7 +153,7 @@ border-radius: 6px;</string>
             <number>10</number>
            </property>
            <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,0,0,0,0">
+            <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,0,0,0">
              <item>
               <widget class="QLabel" name="lblTcpServer">
                <property name="styleSheet">
@@ -165,22 +165,12 @@ border-radius: 6px;</string>
               </widget>
              </item>
              <item>
-              <widget class="QLabel" name="label">
-               <property name="styleSheet">
-                <string notr="true">color: #666666; font-size: 8.5pt;</string>
-               </property>
-               <property name="text">
-                <string>IP: </string>
-               </property>
-              </widget>
-             </item>
-             <item>
               <widget class="QLabel" name="lblServerIp">
                <property name="styleSheet">
                 <string notr="true">color: #666666; font-size: 8.5pt;</string>
                </property>
                <property name="text">
-                <string>192.168.137.1</string>
+                <string>IP: 000.000.000.0</string>
                </property>
               </widget>
              </item>
@@ -211,10 +201,16 @@ border-radius: 6px;</string>
              </item>
              <item>
               <widget class="QPushButton" name="btnStartServer">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
                <property name="minimumSize">
                 <size>
-                 <width>0</width>
-                 <height>0</height>
+                 <width>90</width>
+                 <height>28</height>
                 </size>
                </property>
                <property name="maximumSize">
@@ -222,9 +218,6 @@ border-radius: 6px;</string>
                  <width>16777215</width>
                  <height>16777215</height>
                 </size>
-               </property>
-               <property name="styleSheet">
-                <string notr="true">height: 28px; font-weight: bold;</string>
                </property>
                <property name="text">
                 <string>서버 시작</string>
@@ -388,8 +381,17 @@ border-radius: 6px;</string>
              </item>
              <item>
               <widget class="QPushButton" name="btnSerialConnect">
-               <property name="styleSheet">
-                <string notr="true">height: 28px; font-weight: bold;</string>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>90</width>
+                 <height>28</height>
+                </size>
                </property>
                <property name="text">
                 <string>시리얼 연결</string>
@@ -458,6 +460,12 @@ border-radius: 6px;</string>
              </item>
              <item>
               <widget class="QLabel" name="lblStatusBadge">
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>28</height>
+                </size>
+               </property>
                <property name="styleSheet">
                 <string notr="true">background-color: #34C759; color: white; font-weight: bold; border-radius: 4px; fixedHeight: 26px; AlignCenter</string>
                </property>
@@ -474,7 +482,7 @@ border-radius: 6px;</string>
            <item>
             <layout class="QVBoxLayout" name="verticalLayout_6">
              <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="0,0,0">
+              <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="0,0,0,0">
                <item>
                 <widget class="QLabel" name="lblThreshold">
                  <property name="text">
@@ -498,6 +506,31 @@ border-radius: 6px;</string>
                  </property>
                  <property name="value">
                   <number>3000</number>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="btnApplyThreshold">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>90</width>
+                   <height>28</height>
+                  </size>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>16777215</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>적용</string>
                  </property>
                 </widget>
                </item>

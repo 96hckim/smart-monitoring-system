@@ -39,6 +39,8 @@ private slots:
     // 임계값 SpinBox 값 변경 슬롯
     void on_sbThreshold_valueChanged(int value);
 
+    void on_btnApplyThreshold_clicked();
+
 private:
     QString getLocalIPAddress();
     void updateStatusBadge(bool isDanger);
@@ -48,6 +50,8 @@ private:
     TcpStreamServer* m_streamServer; // 스트리밍 서버 모듈
     SerialManager* m_serialManager; // 시리얼 통신 전담 모듈
     ChartManager* m_chartManager; // 차트 매니저
+
+    int m_currentThreshold = 3000;
 };
 
 #endif // MAINWINDOW_H

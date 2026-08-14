@@ -34,8 +34,12 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 시리얼 포트 목록 채우기
     if (ui->cbPortList) {
-        ui->cbPortList->clear();
-        ui->cbPortList->addItems(m_serialManager->availablePorts());
+        QStringList ports = m_serialManager->availablePorts();
+
+        if (!ports.isEmpty()) {
+            ui->cbPortList->clear();
+            ui->cbPortList->addItems(ports);
+        }
     }
 
     // ----------------------------------------------------
@@ -60,6 +64,20 @@ MainWindow::MainWindow(QWidget* parent)
     }
 
     updateStatusBadge(false); // 초기 상태: 정상(초록색)
+
+    // ⭐ 스핀박스 초기값 설정
+    if (ui->sbThreshold) {
+        ui->sbThreshold->setValue(m_currentThreshold);
+
+        // (선택) 스핀박스에서 숫자를 치고 Enter를 눌렀을 때도 [적용] 버튼 누른 것과 동일하게 처리
+        connect(ui->sbThreshold, &QSpinBox::editingFinished, this, &MainWindow::on_btnApplyThreshold_clicked);
+    }
+
+    // ⭐ 차트 가로선 초기화
+    if (m_chartManager) {
+        m_chartManager->initChart(ui->chartView);
+        m_chartManager->setThreshold(m_currentThreshold);
+    }
 }
 
 MainWindow::~MainWindow()
@@ -179,9 +197,8 @@ void MainWindow::onGasDataReceived(int adcValue)
         m_chartManager->addGasData(adcValue);
     }
 
-    // 3. 임계값 비교 및 상태 배지 / 자동 차단 처리
-    int threshold = ui->sbThreshold ? ui->sbThreshold->value() : 3000;
-    bool isDanger = (adcValue >= threshold);
+    // 3. ⭐ ui->sbThreshold 대신 실제 적용된 m_currentThreshold와 비교!
+    bool isDanger = (adcValue >= m_currentThreshold);
 
     // 상태 배지 업데이트 (정상 <-> 위험)
     updateStatusBadge(isDanger);
@@ -190,7 +207,9 @@ void MainWindow::onGasDataReceived(int adcValue)
     if (ui->chkAutoClose && ui->chkAutoClose->isChecked() && isDanger) {
         if (m_serialManager->sendChar('1')) {
             onLogMessage(Logger::format(LogCategory::Serial, LogLevel::Warn,
-                QString("⚠️ [위험] 가스 수치 초과(%1 >= %2)! 밸브를 자동으로 차단합니다.").arg(adcValue).arg(threshold)));
+                QString("⚠️ [위험] 가스 수치 초과(%1 >= %2)! 밸브를 자동으로 차단합니다.")
+                    .arg(adcValue)
+                    .arg(m_currentThreshold)));
         }
     }
 }
@@ -235,4 +254,28 @@ void MainWindow::on_sbThreshold_valueChanged(int value)
     if (m_chartManager) {
         m_chartManager->setThreshold(value);
     }
+}
+
+void MainWindow::on_btnApplyThreshold_clicked()
+{
+    if (!ui->sbThreshold)
+        return;
+
+    int inputVal = ui->sbThreshold->value();
+
+    // 기존 적용값과 같으면 중복 실행 방지
+    if (m_currentThreshold == inputVal)
+        return;
+
+    // 1. 실제로 적용할 변수 갱신
+    m_currentThreshold = inputVal;
+
+    // 2. 차트 가로선 이동
+    if (m_chartManager) {
+        m_chartManager->setThreshold(m_currentThreshold);
+    }
+
+    // 3. 로그 출력
+    onLogMessage(Logger::format(LogCategory::Serial, LogLevel::Info,
+        QString("가스 위험 임계값이 %1 으로 변경 적용되었습니다.").arg(m_currentThreshold)));
 }

@@ -39,6 +39,8 @@ bool SerialManager::connectPort(const QString& portName, qint32 baudRate)
     m_serialPort->setFlowControl(QSerialPort::NoFlowControl);
 
     if (m_serialPort->open(QIODevice::ReadWrite)) {
+        m_serialPort->clear();
+
         emit statusMessage(Logger::format(LogCategory::Serial, LogLevel::Info,
                                QString("포트 연결 성공: %1 (%2 bps)").arg(portName).arg(baudRate)),
             false);
@@ -99,7 +101,7 @@ void SerialManager::onReadyRead()
         bool isNumber = false;
         int adcVal = line.toInt(&isNumber);
 
-        if (isNumber) {
+        if (isNumber && adcVal >= 0 && adcVal <= 4095) {
             emit dataReceived(adcVal);
         }
     }
