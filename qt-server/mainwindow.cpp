@@ -1,7 +1,6 @@
 ﻿#include "mainwindow.h"
 #include "logger.h"
 #include "ui_mainwindow.h"
-#include <QNetworkInterface>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -10,11 +9,12 @@ MainWindow::MainWindow(QWidget* parent)
     , m_serialManager(new SerialManager(this))
     , m_chartManager(new ChartManager(this))
     , m_currentThreshold(3000)
+    , m_saveDirPath("./logs")
 {
     ui->setupUi(this);
 
     // ----------------------------------------------------
-    // 1. UI 초기 설정 (IP, 접속 상태, BaudRate, 포트)
+    // 1. UI 초기 세팅 (IP, 클라이언트 수, BaudRate, 포트, 저장경로)
     // ----------------------------------------------------
     if (ui->lblServerIp) {
         ui->lblServerIp->setText(QString("IP: %1").arg(getLocalIPAddress()));
@@ -38,8 +38,13 @@ MainWindow::MainWindow(QWidget* parent)
         }
     }
 
+    // CSV 저장 경로 UI 초기화
+    if (ui->leLogPath) {
+        ui->leLogPath->setText(m_saveDirPath);
+    }
+
     // ----------------------------------------------------
-    // 2. 시그널 - 슬롯 연결 (TCP 서버)
+    // 2. 시그널 - 슬롯 연결 (TCP 서버 모듈)
     // ----------------------------------------------------
     connect(m_streamServer, &TcpStreamServer::frameReceived, this, &MainWindow::onFrameReceived);
     connect(m_streamServer, &TcpStreamServer::logMessage, this, &MainWindow::onLogMessage);
@@ -47,14 +52,14 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_streamServer, &TcpStreamServer::valveCommandReceived, this, &MainWindow::onValveCommandFromClient);
 
     // ----------------------------------------------------
-    // 3. 시그널 - 슬롯 연결 (시리얼 통신)
+    // 3. 시그널 - 슬롯 연결 (시리얼 통신 모듈)
     // ----------------------------------------------------
     connect(m_serialManager, &SerialManager::dataReceived, this, &MainWindow::onGasDataReceived);
     connect(m_serialManager, &SerialManager::statusMessage, this, &MainWindow::onSerialStatusMessage);
     connect(m_serialManager, &SerialManager::connectionStateChanged, this, &MainWindow::onSerialConnectionChanged);
 
     // ----------------------------------------------------
-    // 4. 차트 및 스핀박스/배지 초기화 (중복 호출 제거)
+    // 4. 차트 & 임계값 스핀박스 초기화
     // ----------------------------------------------------
     if (ui->chartView) {
         m_chartManager->initChart(ui->chartView);
@@ -63,11 +68,11 @@ MainWindow::MainWindow(QWidget* parent)
 
     if (ui->sbThreshold) {
         ui->sbThreshold->setValue(m_currentThreshold);
-        // 키보드로 입력 후 Enter 키를 눌렀을 때도 적용 버튼 누른 것과 동일하게 연동
+        // SpinBox에서 Enter 키 입력 시 [적용] 버튼 클릭 동작 연동
         connect(ui->sbThreshold, &QSpinBox::editingFinished, this, &MainWindow::on_btnApplyThreshold_clicked);
     }
 
-    updateStatusBadge(false); // 초기 상태: 정상(초록색)
+    updateStatusBadge(false); // 초기 상태 배지: 정상(초록색)
 }
 
 MainWindow::~MainWindow()
@@ -76,32 +81,17 @@ MainWindow::~MainWindow()
 }
 
 // ----------------------------------------------------
-// ⭐ 내 PC의 IPv4 주소를 가져오는 헬퍼 함수 (핫스팟 IP 우선)
+// ⭐ 내 PC의 첫 번째 유효 IPv4 주소 조회
 // ----------------------------------------------------
 QString MainWindow::getLocalIPAddress()
 {
-    QString defaultIp = "";
-    const QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
-
-    for (const QNetworkInterface& netInterface : interfaces) {
-        QNetworkInterface::InterfaceFlags flags = netInterface.flags();
-        if ((flags & QNetworkInterface::IsUp) && !(flags & QNetworkInterface::IsLoopBack)) {
-            for (const QNetworkAddressEntry& entry : netInterface.addressEntries()) {
-                QHostAddress ip = entry.ip();
-                if (ip.protocol() == QAbstractSocket::IPv4Protocol) {
-                    QString ipStr = ip.toString();
-                    // 1순위: 모바일 핫스팟 대역 감지 시 우선 반환
-                    if (ipStr.startsWith("192.168.137.")) {
-                        return ipStr;
-                    }
-                    if (defaultIp.isEmpty()) {
-                        defaultIp = ipStr;
-                    }
-                }
-            }
+    const QList<QHostAddress> addresses = QNetworkInterface::allAddresses();
+    for (const QHostAddress& address : addresses) {
+        if (address != QHostAddress::LocalHost && address.toIPv4Address()) {
+            return address.toString();
         }
     }
-    return defaultIp.isEmpty() ? "127.0.0.1" : defaultIp;
+    return "127.0.0.1";
 }
 
 // ----------------------------------------------------
@@ -132,18 +122,6 @@ void MainWindow::onClientCountChanged(int count)
 {
     if (ui->lblClientCount) {
         ui->lblClientCount->setText(QString("접속 상태: 클라이언트 %1 명 접속 중").arg(count));
-    }
-}
-
-// ⭐ 안드로이드 앱에서 밸브 차단/복구 버튼을 눌렀을 때 실행
-void MainWindow::onValveCommandFromClient(char cmd)
-{
-    if (cmd == '1') {
-        onLogMessage(Logger::format(LogCategory::TCP, LogLevel::Info, "📱 [안드로이드 원격 제어] 밸브 차단 요청 수신"));
-        on_btnValveClose_clicked(); // 기존 밸브 차단 함수 실행 (STM32로 '1' 전달)
-    } else if (cmd == '0') {
-        onLogMessage(Logger::format(LogCategory::TCP, LogLevel::Info, "📱 [안드로이드 원격 제어] 밸브 복구 요청 수신"));
-        on_btnValveOpen_clicked(); // 기존 밸브 복구 함수 실행 (STM32로 '0' 전달)
     }
 }
 
@@ -181,6 +159,7 @@ void MainWindow::on_btnSerialConnect_clicked()
     }
 }
 
+// [밸브 차단] 버튼 ('1' 송신)
 void MainWindow::on_btnValveClose_clicked()
 {
     if (m_serialManager->sendChar('1')) {
@@ -188,6 +167,7 @@ void MainWindow::on_btnValveClose_clicked()
     }
 }
 
+// [밸브 복구] 버튼 ('0' 송신)
 void MainWindow::on_btnValveOpen_clicked()
 {
     if (m_serialManager->sendChar('0')) {
@@ -196,11 +176,11 @@ void MainWindow::on_btnValveOpen_clicked()
 }
 
 // ----------------------------------------------------
-// 가스 수치 데이터 수신 처리
+// ⭐ 가스 수치 실시간 수신 처리 핵심 로직
 // ----------------------------------------------------
 void MainWindow::onGasDataReceived(int adcValue)
 {
-    // 1. UI 라벨 수치 표출
+    // 1. UI 라벨 표출
     if (ui->lblGasVal) {
         ui->lblGasVal->setText(QString::number(adcValue));
     }
@@ -210,18 +190,21 @@ void MainWindow::onGasDataReceived(int adcValue)
         m_chartManager->addGasData(adcValue);
     }
 
-    // 3. ⭐ [추가] 연결된 안드로이드 클라이언트로 가스 수치 + 현재 임계값 실시간 중계!
+    // 3. 안드로이드 클라이언트로 가스 수치 + 현재 임계값 실시간 중계 (GAS:adc:thresh)
     if (m_streamServer) {
         m_streamServer->sendGasDataToClient(adcValue, m_currentThreshold);
     }
 
-    // 4. 확정된 m_currentThreshold와 수치 비교
+    // 4. 위험 판단
     bool isDanger = (adcValue >= m_currentThreshold);
 
-    // 5. 상태 배지 업데이트 (정상 <-> 위험)
+    // 5. CSV 파일로 실시간 누적 저장 (체크박스 활성화 시)
+    logGasDataToCsv(adcValue, m_currentThreshold, isDanger);
+
+    // 6. UI 상태 배지 업데이트
     updateStatusBadge(isDanger);
 
-    // 6. 자동 차단 체크 시 위험 상황 동작
+    // 7. 자동 차단 체크 시 위험 상황 제어
     if (ui->chkAutoClose && ui->chkAutoClose->isChecked() && isDanger) {
         if (m_serialManager->sendChar('1')) {
             onLogMessage(Logger::format(LogCategory::Serial, LogLevel::Warn,
@@ -233,7 +216,21 @@ void MainWindow::onGasDataReceived(int adcValue)
 }
 
 // ----------------------------------------------------
-// [적용] 버튼 클릭 시 동작하는 슬롯
+// ⭐ 안드로이드 원격 제어 명령 수신 슬롯
+// ----------------------------------------------------
+void MainWindow::onValveCommandFromClient(char cmd)
+{
+    if (cmd == '1') {
+        onLogMessage(Logger::format(LogCategory::TCP, LogLevel::Info, "📱 [안드로이드 원격 제어] 밸브 차단 요청 수신"));
+        on_btnValveClose_clicked();
+    } else if (cmd == '0') {
+        onLogMessage(Logger::format(LogCategory::TCP, LogLevel::Info, "📱 [안드로이드 원격 제어] 밸브 복구 요청 수신"));
+        on_btnValveOpen_clicked();
+    }
+}
+
+// ----------------------------------------------------
+// [임계값 적용] 버튼 클릭 슬롯
 // ----------------------------------------------------
 void MainWindow::on_btnApplyThreshold_clicked()
 {
@@ -241,25 +238,101 @@ void MainWindow::on_btnApplyThreshold_clicked()
         return;
 
     int inputVal = ui->sbThreshold->value();
-
-    // 기존 적용값과 같으면 중복 실행 방지
     if (m_currentThreshold == inputVal)
         return;
 
-    // 1. 실제 내부 위험 임계값 갱신
     m_currentThreshold = inputVal;
 
-    // 2. 차트 가로선 위치 반영
     if (m_chartManager) {
         m_chartManager->setThreshold(m_currentThreshold);
     }
 
-    // 3. 변경 결과 로그 출력
     onLogMessage(Logger::format(LogCategory::Serial, LogLevel::Info,
         QString("가스 위험 임계값이 %1 ADC로 변경 적용되었습니다.").arg(m_currentThreshold)));
 }
 
-// ⭐ 상태 배지 UI 갱신 헬퍼
+// ----------------------------------------------------
+// ⭐ [경로 선택] 버튼 클릭 슬롯 (QFileDialog 연동)
+// ----------------------------------------------------
+void MainWindow::on_btnSelectPath_clicked()
+{
+    QString selectedDir = QFileDialog::getExistingDirectory(
+        this,
+        "로그 파일 저장 폴더 선택",
+        m_saveDirPath,
+        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+
+    if (!selectedDir.isEmpty()) {
+        m_saveDirPath = selectedDir;
+
+        if (ui->leLogPath) {
+            ui->leLogPath->setText(m_saveDirPath);
+        }
+
+        onLogMessage(Logger::format(LogCategory::System, LogLevel::Info,
+            QString("CSV 저장 경로가 변경되었습니다: %1").arg(m_saveDirPath)));
+    }
+}
+
+// ----------------------------------------------------
+// ⭐ [폴더 열기] 버튼 클릭 슬롯 (윈도우 탐색기 열기)
+// ----------------------------------------------------
+void MainWindow::on_btnOpenFolder_clicked()
+{
+    // 폴더가 없으면 우선 생성
+    QDir dir(m_saveDirPath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+
+    // 윈도우 파일 탐색기로 해당 경로 열기
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_saveDirPath));
+}
+
+// ----------------------------------------------------
+// ⭐ 가스 수치를 일자별 CSV 파일에 저장하는 함수
+// ----------------------------------------------------
+void MainWindow::logGasDataToCsv(int adcValue, int threshold, bool isDanger)
+{
+    // CSV 저장 체크박스가 꺼져있으면 기록 안 함
+    if (ui->chkEnableLogging && !ui->chkEnableLogging->isChecked()) {
+        return;
+    }
+
+    // 1. 지정된 저장 폴더 존재 확인 및 생성
+    QDir dir(m_saveDirPath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+
+    // 2. 일자별 파일명 (예: ./logs/gas_log_2026-08-14.csv)
+    QString dateStr = QDate::currentDate().toString("yyyy-MM-dd");
+    QString filePath = QString("%1/gas_log_%2.csv").arg(m_saveDirPath, dateStr);
+
+    QFile file(filePath);
+    bool isNewFile = !file.exists();
+
+    // 3. Append(덧붙이기) 모드로 열어 데이터 기록
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        QTextStream out(&file);
+
+        // 새 파일인 경우 최상단 컬럼 헤더 추가
+        if (isNewFile) {
+            out << "Timestamp,ADC_Value,Threshold,Status\n";
+        }
+
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+        QString status = isDanger ? "DANGER" : "NORMAL";
+
+        // 데이터 한 줄 덧붙이기
+        out << timestamp << "," << adcValue << "," << threshold << "," << status << "\n";
+        file.close();
+    }
+}
+
+// ----------------------------------------------------
+// UI 상태 배지 업데이트 헬퍼
+// ----------------------------------------------------
 void MainWindow::updateStatusBadge(bool isDanger)
 {
     if (!ui->lblStatusBadge)
