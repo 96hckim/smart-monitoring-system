@@ -1,7 +1,7 @@
 ﻿#include "mainwindow.h"
 #include "logger.h"
 #include "ui_mainwindow.h"
-#include <QNetworkInterface> // ⭐ 내 PC IP 조회를 위해 추가
+#include <QNetworkInterface>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -9,33 +9,29 @@ MainWindow::MainWindow(QWidget* parent)
     , m_streamServer(new TcpStreamServer(this))
     , m_serialManager(new SerialManager(this))
     , m_chartManager(new ChartManager(this))
+    , m_currentThreshold(3000)
 {
     ui->setupUi(this);
 
     // ----------------------------------------------------
-    // 1. ⭐ UI 초기 설정 (IP, 접속 상태, BaudRate)
+    // 1. UI 초기 설정 (IP, 접속 상태, BaudRate, 포트)
     // ----------------------------------------------------
-    // 내 PC IPv4 주소 자동 조회 및 라벨 출력
     if (ui->lblServerIp) {
         ui->lblServerIp->setText(QString("IP: %1").arg(getLocalIPAddress()));
     }
 
-    // 클라이언트 접속 상태 초기화
     if (ui->lblClientCount) {
         ui->lblClientCount->setText("접속 상태: 클라이언트 0 명 접속 중");
     }
 
-    // 시리얼 BaudRate 콤보박스 목록 설정 (기본값 115200)
     if (ui->cbBaudRate) {
         ui->cbBaudRate->clear();
         ui->cbBaudRate->addItems({ "9600", "19200", "38400", "57600", "115200" });
         ui->cbBaudRate->setCurrentText("115200");
     }
 
-    // 시리얼 포트 목록 채우기
     if (ui->cbPortList) {
         QStringList ports = m_serialManager->availablePorts();
-
         if (!ports.isEmpty()) {
             ui->cbPortList->clear();
             ui->cbPortList->addItems(ports);
@@ -48,6 +44,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_streamServer, &TcpStreamServer::frameReceived, this, &MainWindow::onFrameReceived);
     connect(m_streamServer, &TcpStreamServer::logMessage, this, &MainWindow::onLogMessage);
     connect(m_streamServer, &TcpStreamServer::clientCountChanged, this, &MainWindow::onClientCountChanged);
+    connect(m_streamServer, &TcpStreamServer::valveCommandReceived, this, &MainWindow::onValveCommandFromClient);
 
     // ----------------------------------------------------
     // 3. 시그널 - 슬롯 연결 (시리얼 통신)
@@ -57,27 +54,20 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_serialManager, &SerialManager::connectionStateChanged, this, &MainWindow::onSerialConnectionChanged);
 
     // ----------------------------------------------------
-    // 4. 차트 및 상태 배지 초기화
+    // 4. 차트 및 스핀박스/배지 초기화 (중복 호출 제거)
     // ----------------------------------------------------
     if (ui->chartView) {
         m_chartManager->initChart(ui->chartView);
+        m_chartManager->setThreshold(m_currentThreshold);
     }
 
-    updateStatusBadge(false); // 초기 상태: 정상(초록색)
-
-    // ⭐ 스핀박스 초기값 설정
     if (ui->sbThreshold) {
         ui->sbThreshold->setValue(m_currentThreshold);
-
-        // (선택) 스핀박스에서 숫자를 치고 Enter를 눌렀을 때도 [적용] 버튼 누른 것과 동일하게 처리
+        // 키보드로 입력 후 Enter 키를 눌렀을 때도 적용 버튼 누른 것과 동일하게 연동
         connect(ui->sbThreshold, &QSpinBox::editingFinished, this, &MainWindow::on_btnApplyThreshold_clicked);
     }
 
-    // ⭐ 차트 가로선 초기화
-    if (m_chartManager) {
-        m_chartManager->initChart(ui->chartView);
-        m_chartManager->setThreshold(m_currentThreshold);
-    }
+    updateStatusBadge(false); // 초기 상태: 정상(초록색)
 }
 
 MainWindow::~MainWindow()
@@ -86,29 +76,43 @@ MainWindow::~MainWindow()
 }
 
 // ----------------------------------------------------
-// ⭐ 내 PC의 IPv4 주소를 가져오는 헬퍼 함수
+// ⭐ 내 PC의 IPv4 주소를 가져오는 헬퍼 함수 (핫스팟 IP 우선)
 // ----------------------------------------------------
 QString MainWindow::getLocalIPAddress()
 {
-    const QList<QHostAddress> addresses = QNetworkInterface::allAddresses();
-    for (const QHostAddress& address : addresses) {
-        if (address != QHostAddress::LocalHost && address.toIPv4Address()) {
-            return address.toString();
+    QString defaultIp = "";
+    const QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+
+    for (const QNetworkInterface& netInterface : interfaces) {
+        QNetworkInterface::InterfaceFlags flags = netInterface.flags();
+        if ((flags & QNetworkInterface::IsUp) && !(flags & QNetworkInterface::IsLoopBack)) {
+            for (const QNetworkAddressEntry& entry : netInterface.addressEntries()) {
+                QHostAddress ip = entry.ip();
+                if (ip.protocol() == QAbstractSocket::IPv4Protocol) {
+                    QString ipStr = ip.toString();
+                    // 1순위: 모바일 핫스팟 대역 감지 시 우선 반환
+                    if (ipStr.startsWith("192.168.137.")) {
+                        return ipStr;
+                    }
+                    if (defaultIp.isEmpty()) {
+                        defaultIp = ipStr;
+                    }
+                }
+            }
         }
     }
-    return "127.0.0.1";
+    return defaultIp.isEmpty() ? "127.0.0.1" : defaultIp;
 }
 
 // ----------------------------------------------------
-// ⭐ [서버 시작 / 중지] 토글 버튼 (isListening 에러 수정 위치)
+// [서버 시작 / 중지] 토글 버튼
 // ----------------------------------------------------
 void MainWindow::on_btnStartServer_clicked()
 {
-    // 버튼 텍스트가 "서버 시작"이면 구동, 아니면 중지
     if (ui->btnStartServer->text() == "서버 시작") {
         quint16 port = ui->lePort->text().toUShort();
         if (port == 0)
-            port = 8080; // 기본 포트 8080
+            port = 8080;
 
         if (m_streamServer->startServer(port)) {
             ui->btnStartServer->setText("서버 중지");
@@ -124,11 +128,22 @@ void MainWindow::on_btnStartServer_clicked()
     }
 }
 
-// ⭐ 클라이언트 접속자 수 변경 슬롯
 void MainWindow::onClientCountChanged(int count)
 {
     if (ui->lblClientCount) {
         ui->lblClientCount->setText(QString("접속 상태: 클라이언트 %1 명 접속 중").arg(count));
+    }
+}
+
+// ⭐ 안드로이드 앱에서 밸브 차단/복구 버튼을 눌렀을 때 실행
+void MainWindow::onValveCommandFromClient(char cmd)
+{
+    if (cmd == '1') {
+        onLogMessage(Logger::format(LogCategory::TCP, LogLevel::Info, "📱 [안드로이드 원격 제어] 밸브 차단 요청 수신"));
+        on_btnValveClose_clicked(); // 기존 밸브 차단 함수 실행 (STM32로 '1' 전달)
+    } else if (cmd == '0') {
+        onLogMessage(Logger::format(LogCategory::TCP, LogLevel::Info, "📱 [안드로이드 원격 제어] 밸브 복구 요청 수신"));
+        on_btnValveOpen_clicked(); // 기존 밸브 복구 함수 실행 (STM32로 '0' 전달)
     }
 }
 
@@ -150,7 +165,7 @@ void MainWindow::onLogMessage(const QString& message)
 }
 
 // ----------------------------------------------------
-// ⭐ [시리얼 연결 / 해제] 버튼 (BaudRate 연동)
+// [시리얼 연결 / 해제] 버튼
 // ----------------------------------------------------
 void MainWindow::on_btnSerialConnect_clicked()
 {
@@ -166,7 +181,6 @@ void MainWindow::on_btnSerialConnect_clicked()
     }
 }
 
-// [밸브 차단] 버튼 클릭
 void MainWindow::on_btnValveClose_clicked()
 {
     if (m_serialManager->sendChar('1')) {
@@ -174,7 +188,6 @@ void MainWindow::on_btnValveClose_clicked()
     }
 }
 
-// [밸브 복구] 버튼 클릭
 void MainWindow::on_btnValveOpen_clicked()
 {
     if (m_serialManager->sendChar('0')) {
@@ -183,27 +196,32 @@ void MainWindow::on_btnValveOpen_clicked()
 }
 
 // ----------------------------------------------------
-// ⭐ 가스 수치 데이터 수신 및 배지/자동 차단 제어
+// 가스 수치 데이터 수신 처리
 // ----------------------------------------------------
 void MainWindow::onGasDataReceived(int adcValue)
 {
-    // 1. 라벨 수치 표출
+    // 1. UI 라벨 수치 표출
     if (ui->lblGasVal) {
         ui->lblGasVal->setText(QString::number(adcValue));
     }
 
-    // 2. 실시간 차트에 점 추가
+    // 2. 실시간 차트에 데이터 점 추가
     if (m_chartManager) {
         m_chartManager->addGasData(adcValue);
     }
 
-    // 3. ⭐ ui->sbThreshold 대신 실제 적용된 m_currentThreshold와 비교!
+    // 3. ⭐ [추가] 연결된 안드로이드 클라이언트로 가스 수치 + 현재 임계값 실시간 중계!
+    if (m_streamServer) {
+        m_streamServer->sendGasDataToClient(adcValue, m_currentThreshold);
+    }
+
+    // 4. 확정된 m_currentThreshold와 수치 비교
     bool isDanger = (adcValue >= m_currentThreshold);
 
-    // 상태 배지 업데이트 (정상 <-> 위험)
+    // 5. 상태 배지 업데이트 (정상 <-> 위험)
     updateStatusBadge(isDanger);
 
-    // 자동 차단 옵션 체크 시 위험 상황 처리
+    // 6. 자동 차단 체크 시 위험 상황 동작
     if (ui->chkAutoClose && ui->chkAutoClose->isChecked() && isDanger) {
         if (m_serialManager->sendChar('1')) {
             onLogMessage(Logger::format(LogCategory::Serial, LogLevel::Warn,
@@ -214,7 +232,34 @@ void MainWindow::onGasDataReceived(int adcValue)
     }
 }
 
-// ⭐ 상태 배지(lblStatusBadge) 색상 및 문구 변경 헬퍼
+// ----------------------------------------------------
+// [적용] 버튼 클릭 시 동작하는 슬롯
+// ----------------------------------------------------
+void MainWindow::on_btnApplyThreshold_clicked()
+{
+    if (!ui->sbThreshold)
+        return;
+
+    int inputVal = ui->sbThreshold->value();
+
+    // 기존 적용값과 같으면 중복 실행 방지
+    if (m_currentThreshold == inputVal)
+        return;
+
+    // 1. 실제 내부 위험 임계값 갱신
+    m_currentThreshold = inputVal;
+
+    // 2. 차트 가로선 위치 반영
+    if (m_chartManager) {
+        m_chartManager->setThreshold(m_currentThreshold);
+    }
+
+    // 3. 변경 결과 로그 출력
+    onLogMessage(Logger::format(LogCategory::Serial, LogLevel::Info,
+        QString("가스 위험 임계값이 %1 ADC로 변경 적용되었습니다.").arg(m_currentThreshold)));
+}
+
+// ⭐ 상태 배지 UI 갱신 헬퍼
 void MainWindow::updateStatusBadge(bool isDanger)
 {
     if (!ui->lblStatusBadge)
@@ -246,36 +291,4 @@ void MainWindow::onSerialConnectionChanged(bool isConnected)
     if (ui->cbBaudRate) {
         ui->cbBaudRate->setEnabled(!isConnected);
     }
-}
-
-// UI에서 임계값(SpinBox) 숫자를 변경하면 차트 가로선 위치도 같이 이동
-void MainWindow::on_sbThreshold_valueChanged(int value)
-{
-    if (m_chartManager) {
-        m_chartManager->setThreshold(value);
-    }
-}
-
-void MainWindow::on_btnApplyThreshold_clicked()
-{
-    if (!ui->sbThreshold)
-        return;
-
-    int inputVal = ui->sbThreshold->value();
-
-    // 기존 적용값과 같으면 중복 실행 방지
-    if (m_currentThreshold == inputVal)
-        return;
-
-    // 1. 실제로 적용할 변수 갱신
-    m_currentThreshold = inputVal;
-
-    // 2. 차트 가로선 이동
-    if (m_chartManager) {
-        m_chartManager->setThreshold(m_currentThreshold);
-    }
-
-    // 3. 로그 출력
-    onLogMessage(Logger::format(LogCategory::Serial, LogLevel::Info,
-        QString("가스 위험 임계값이 %1 으로 변경 적용되었습니다.").arg(m_currentThreshold)));
 }

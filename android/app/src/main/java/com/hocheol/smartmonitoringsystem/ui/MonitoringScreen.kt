@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -14,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,13 +21,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -55,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -73,7 +83,10 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
     val port by viewModel.port.collectAsStateWithLifecycle()
     val isConnected by viewModel.isConnected.collectAsStateWithLifecycle()
     val isStreaming by viewModel.isStreaming.collectAsStateWithLifecycle()
-    val message by viewModel.message.collectAsStateWithLifecycle()
+    val cameraSelector by viewModel.cameraSelector.collectAsStateWithLifecycle()
+    val isFlashEnabled by viewModel.isFlashEnabled.collectAsStateWithLifecycle()
+    val gasValue by viewModel.gasValue.collectAsStateWithLifecycle()
+    val threshold by viewModel.threshold.collectAsStateWithLifecycle()
     val logs by viewModel.logs.collectAsStateWithLifecycle()
 
     var hasCameraPermission by remember {
@@ -96,7 +109,7 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val previewView = remember { PreviewView(context) }
 
-    LaunchedEffect(hasCameraPermission) {
+    LaunchedEffect(hasCameraPermission, cameraSelector, isFlashEnabled) {
         if (hasCameraPermission) {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
             cameraProviderFuture.addListener({
@@ -121,9 +134,10 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
 
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis
+                    val camera = cameraProvider.bindToLifecycle(
+                        lifecycleOwner, cameraSelector, preview, imageAnalysis
                     )
+                    camera.cameraControl.enableTorch(isFlashEnabled)
                 } catch (e: Exception) {
                     Log.e("MonitoringScreen", "Camera binding failed", e)
                 }
@@ -135,10 +149,49 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Smart Monitoring System") },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 8.dp)
+                    ) {
+                        Text(
+                            "🛡️ Gas Shield",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            color = if (isConnected) Color(0xFF4CAF50).copy(alpha = 0.1f) else Color.Red.copy(
+                                alpha = 0.1f
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isConnected) Color(0xFF4CAF50) else Color.Red)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (isConnected) "Connected" else "Disconnected",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isConnected) Color(0xFF2E7D32) else Color.Red
+                                )
+                            }
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -147,10 +200,21 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            CameraSection(
+                hasPermission = hasCameraPermission,
+                previewView = previewView,
+                isConnected = isConnected,
+                isStreaming = isStreaming,
+                isFlashEnabled = isFlashEnabled,
+                onToggleCamera = viewModel::toggleCamera,
+                onToggleFlash = viewModel::toggleFlash,
+                onToggleStreaming = viewModel::toggleStreaming
+            )
+
             ConnectionSection(
                 ip = ip,
                 port = port,
@@ -159,20 +223,152 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
                 onPortChange = viewModel::onPortChange,
                 onToggleConnection = viewModel::toggleConnection
             )
-            CameraSection(
-                hasPermission = hasCameraPermission,
-                previewView = previewView,
+
+            GasControlSection(
+                gasValue = gasValue,
+                threshold = threshold,
                 isConnected = isConnected,
-                isStreaming = isStreaming,
-                onToggleStreaming = viewModel::toggleStreaming
+                onValveClose = viewModel::sendValveClose,
+                onValveOpen = viewModel::sendValveOpen
             )
-//            MessageSection(
-//                message = message,
-//                isConnected = isConnected,
-//                onMessageChange = viewModel::onMessageChange,
-//                onSendMessage = viewModel::sendMessage
-//            )
+
             LogSection(logs = logs)
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+fun CameraSection(
+    hasPermission: Boolean,
+    previewView: PreviewView,
+    isConnected: Boolean,
+    isStreaming: Boolean,
+    isFlashEnabled: Boolean,
+    onToggleCamera: () -> Unit,
+    onToggleFlash: () -> Unit,
+    onToggleStreaming: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = 0.5f
+            )
+        )
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black)
+            ) {
+                if (hasPermission) {
+                    AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+
+                    // Overlays
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isStreaming) Color.Red else Color.Gray)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (isStreaming) "LIVE" else "IDLE",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("카메라 권한이 필요합니다.", color = Color.White)
+                    }
+                }
+            }
+
+            // Quick Actions Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Streaming Button (Moved here to not block the screen)
+                Button(
+                    onClick = onToggleStreaming,
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .height(44.dp),
+                    enabled = isConnected,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isStreaming) Color(0xFFF44336) else MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                ) {
+                    Icon(
+                        if (isStreaming) Icons.Default.Stop else Icons.Default.PlayArrow,
+                        null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        if (isStreaming) "중지" else "전송",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+                Button(
+                    onClick = onToggleCamera,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Cameraswitch, null, modifier = Modifier.size(18.dp))
+                }
+
+                Button(
+                    onClick = onToggleFlash,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isFlashEnabled) Color(0xFFFFD700) else MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = if (isFlashEnabled) Color.Black else MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.FlashOn, null, modifier = Modifier.size(18.dp))
+                }
+            }
         }
     }
 }
@@ -188,146 +384,180 @@ fun ConnectionSection(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = 0.3f
+            )
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                "서버 연결 설정",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "Network Setting",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                // Smaller Connect Button
+                Button(
+                    onClick = onToggleConnection,
+                    modifier = Modifier.height(36.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isConnected) Color(0xFFF44336) else MaterialTheme.colorScheme.primary
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                ) {
+                    Icon(
+                        if (isConnected) Icons.Default.WifiOff else Icons.Default.Wifi,
+                        null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (isConnected) "Disconnect" else "Connect",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedTextField(
                     value = ip,
                     onValueChange = onIpChange,
-                    label = { Text("IP 주소") },
-                    modifier = Modifier.weight(2f),
+                    placeholder = { Text("Server IP", style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.weight(1.5f),
                     enabled = !isConnected,
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium
                 )
                 OutlinedTextField(
                     value = port,
                     onValueChange = onPortChange,
-                    label = { Text("포트") },
-                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Port", style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.weight(0.7f),
                     enabled = !isConnected,
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium
                 )
             }
-            Button(
-                onClick = onToggleConnection,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = if (isConnected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            ) {
-                Text(if (isConnected) "연결 해제" else "서버 연결")
-            }
         }
     }
 }
 
 @Composable
-fun CameraSection(
-    hasPermission: Boolean,
-    previewView: PreviewView,
+fun GasControlSection(
+    gasValue: Int,
+    threshold: Int,
     isConnected: Boolean,
-    isStreaming: Boolean,
-    onToggleStreaming: () -> Unit
+    onValveClose: () -> Unit,
+    onValveOpen: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "카메라 미리보기",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            if (hasPermission) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(280.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(Color.Black)
-                ) {
-                    AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
-                    if (isConnected) {
-                        Button(
-                            onClick = onToggleStreaming,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isStreaming) Color.Red else MaterialTheme.colorScheme.secondary)
-                        ) {
-                            Icon(
-                                if (isStreaming) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                null
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (isStreaming) "스트리밍 중지" else "영상 전송 시작")
-                        }
-                    }
-                }
-            } else {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Box(contentAlignment = Alignment.Center) { Text("카메라 권한이 필요합니다.") }
-                }
-            }
-        }
-    }
-}
+    val isDanger = gasValue >= threshold
 
-@Composable
-fun MessageSection(
-    message: String,
-    isConnected: Boolean,
-    onMessageChange: (String) -> Unit,
-    onSendMessage: () -> Unit
-) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = 0.3f
+            )
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                "메시지 전송",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Bottom, // Align baseline
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        "Gas Level",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "$gasValue",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (isDanger) Color.Red else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "Status",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        color = if (isDanger) Color.Red else Color(0xFF4CAF50),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = if (isDanger) "DANGER" else "NORMAL",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium, // Slightly smaller
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
-                    value = message,
-                    onValueChange = onMessageChange,
-                    placeholder = { Text("메시지 입력...") },
-                    modifier = Modifier.weight(1f),
-                    enabled = isConnected,
-                    singleLine = true
-                )
                 Button(
-                    onClick = onSendMessage,
-                    enabled = isConnected && message.isNotBlank()
-                ) { Text("전송") }
+                    onClick = onValveClose,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp), // Smaller height
+                    enabled = isConnected,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Lock, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("밸브 차단", style = MaterialTheme.typography.labelMedium)
+                }
+                Button(
+                    onClick = onValveOpen,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp), // Smaller height
+                    enabled = isConnected,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.LockOpen, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("밸브 복구", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }
@@ -335,45 +565,44 @@ fun MessageSection(
 
 @Composable
 fun LogSection(logs: List<String>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Text(
+            "System Logs",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                "통신 로그",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp)
+                    .padding(12.dp)
+                    .heightIn(min = 60.dp, max = 120.dp)
             ) {
                 if (logs.isEmpty()) {
                     Text(
-                        "로그가 없습니다.",
+                        "No logs available.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    logs.forEach { log ->
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Text(
-                                text = log,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
+                    logs.asReversed().forEach { log ->
+                        Text(
+                            text = log,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 11.sp
+                            ),
+                            modifier = Modifier.padding(vertical = 1.dp)
+                        )
                     }
                 }
             }

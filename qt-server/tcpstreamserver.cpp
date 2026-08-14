@@ -43,6 +43,16 @@ void TcpStreamServer::stopServer()
     }
 }
 
+// ⭐ 연결된 안드로이드 클라이언트로 가스 수치 데이터를 쏴주는 로직
+void TcpStreamServer::sendGasDataToClient(int adcValue, int threshold)
+{
+    if (m_clientSocket && m_clientSocket->isOpen()) {
+        // 포맷: GAS:수치:임계값\n
+        QString dataStr = QString("GAS:%1:%2\n").arg(adcValue).arg(threshold);
+        m_clientSocket->write(dataStr.toUtf8());
+    }
+}
+
 void TcpStreamServer::onNewConnection()
 {
     if (m_clientSocket) {
@@ -75,10 +85,39 @@ void TcpStreamServer::onReadyRead()
 
     m_buffer.append(socket->readAll());
 
-    while (true) {
+    while (!m_buffer.isEmpty()) {
+
+        // =========================================================
+        // [1단계] 아직 헤더를 안 읽은 새 패킷 시작점일 때 (m_imageSize == 0)
+        // =========================================================
         if (m_imageSize == 0) {
+
+            // A. 텍스트 명령어 처리 ('1', '0' 등 첫 바이트가 0x00이 아닌 경우)
+            if (static_cast<unsigned char>(m_buffer[0]) != 0x00) {
+                int newlineIdx = m_buffer.indexOf('\n');
+
+                if (newlineIdx != -1) {
+                    QByteArray lineBytes = m_buffer.left(newlineIdx).trimmed();
+                    m_buffer.remove(0, newlineIdx + 1);
+
+                    QString cmd = QString::fromUtf8(lineBytes);
+                    if (cmd == "1" || cmd == "0") {
+                        emit valveCommandReceived(cmd.at(0).toLatin1());
+                    }
+                } else if (m_buffer.size() == 1 && (m_buffer[0] == '1' || m_buffer[0] == '0')) {
+                    char cmdChar = m_buffer[0];
+                    m_buffer.remove(0, 1);
+                    emit valveCommandReceived(cmdChar);
+                } else {
+                    // 개행문자(\n)가 다 올 때까지 대기
+                    break;
+                }
+                continue; // 다음 루프로 이동
+            }
+
+            // B. 비디오 프레임 헤더 읽기 (첫 바이트가 0x00인 바이너리 길이)
             if (m_buffer.size() < static_cast<int>(sizeof(qint32))) {
-                return;
+                break; // 4바이트 헤더가 다 쌓일 때까지 대기
             }
 
             QDataStream stream(m_buffer.left(sizeof(qint32)));
@@ -96,8 +135,11 @@ void TcpStreamServer::onReadyRead()
             }
         }
 
+        // =========================================================
+        // [2단계] 비디오 프레임 바디(JPEG) 수신 (m_imageSize > 0)
+        // =========================================================
         if (m_buffer.size() < m_imageSize) {
-            return;
+            break; // 전체 이미지 데이터가 다 올 때까지 대기
         }
 
         QByteArray jpegData = m_buffer.left(m_imageSize);
@@ -108,11 +150,7 @@ void TcpStreamServer::onReadyRead()
             emit frameReceived(pixmap);
         }
 
-        m_imageSize = 0;
-
-        if (m_buffer.size() < static_cast<int>(sizeof(qint32))) {
-            break;
-        }
+        m_imageSize = 0; // 프레임 완료 후 초기화
     }
 }
 

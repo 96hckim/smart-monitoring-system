@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
@@ -25,6 +27,9 @@ class TcpSocketClient(
     private var reader: BufferedReader? = null
     private var outputStream: OutputStream? = null
     private var receiveJob: Job? = null
+
+    // 전송 스레드 안전성을 위한 Mutex
+    private val sendMutex = Mutex()
 
     private val _events = MutableSharedFlow<SocketEvent>()
     val events = _events.asSharedFlow()
@@ -80,32 +85,36 @@ class TcpSocketClient(
 
     fun sendText(text: String) {
         scope.launch(Dispatchers.IO) {
-            try {
-                writer?.println(text)
-            } catch (e: Exception) {
-                _events.emit(SocketEvent.Error("Send failed: ${e.message}"))
+            sendMutex.withLock {
+                try {
+                    writer?.println(text)
+                } catch (e: Exception) {
+                    _events.emit(SocketEvent.Error("Send failed: ${e.message}"))
+                }
             }
         }
     }
 
     fun sendRaw(data: ByteArray) {
         scope.launch(Dispatchers.IO) {
-            try {
-                outputStream?.let { os ->
-                    val size = data.size
-                    os.write(
-                        byteArrayOf(
-                            (size ushr 24).toByte(),
-                            (size ushr 16).toByte(),
-                            (size ushr 8).toByte(),
-                            size.toByte()
+            sendMutex.withLock {
+                try {
+                    outputStream?.let { os ->
+                        val size = data.size
+                        os.write(
+                            byteArrayOf(
+                                (size ushr 24).toByte(),
+                                (size ushr 16).toByte(),
+                                (size ushr 8).toByte(),
+                                size.toByte()
+                            )
                         )
-                    )
-                    os.write(data)
-                    os.flush()
+                        os.write(data)
+                        os.flush()
+                    }
+                } catch (e: Exception) {
+                    // Raw data errors are often too frequent to log
                 }
-            } catch (e: Exception) {
-                // Raw data errors are often too frequent to log as critical events
             }
         }
     }

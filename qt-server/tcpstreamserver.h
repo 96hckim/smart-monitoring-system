@@ -16,11 +16,14 @@ public:
     bool startServer(quint16 port);
     void stopServer();
 
+    // ⭐ 안드로이드 클라이언트로 가스 수치를 쏴주는 중계 함수 (추후 연동용)
+    void sendGasDataToClient(int adcValue, int threshold);
+
 signals:
-    // ⭐ MainWindow에 전달할 시그널 정의
-    void frameReceived(const QPixmap& pixmap); // 완성된 영상 프레임 전달
-    void logMessage(const QString& message); // 로그 메시지 전달
+    void frameReceived(const QPixmap& pixmap);
+    void logMessage(const QString& message);
     void clientCountChanged(int count);
+    void valveCommandReceived(char cmd);
 
 private slots:
     void onNewConnection();
