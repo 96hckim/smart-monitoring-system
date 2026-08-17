@@ -1,10 +1,10 @@
 #include "device_driver.h"
 #include <stdio.h>
 
-extern volatile unsigned long Sys_Tick;
+extern volatile unsigned long g_sys_tick;
 
-volatile unsigned char rx_cmd = '0';
-volatile unsigned char rx_flag = 0;
+volatile unsigned char g_rx_cmd = '0';
+volatile unsigned char g_rx_flag = 0;
 
 void _Invalid_ISR(void)
 {
@@ -20,12 +20,12 @@ void TIM4_IRQHandler(void)
 {
 	Macro_Clear_Bit(TIM4->SR, 0U);
 	NVIC_ClearPendingIRQ(TIM4_IRQn);
-	Sys_Tick++;
+	g_sys_tick++;
 }
 
 // UART2 수신 인터럽트 ISR (Qt 원격 제어 명령 수신)
 void USART2_IRQHandler(void)
 {
-	rx_cmd = (unsigned char)(USART2->DR & 0xFF);
-	rx_flag = 1;
+	g_rx_cmd = (unsigned char)(USART2->DR & 0xFF);
+	g_rx_flag = 1;
 }

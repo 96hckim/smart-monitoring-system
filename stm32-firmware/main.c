@@ -5,9 +5,9 @@
 #include "motor.h"
 #include <stdio.h>
 
-extern volatile unsigned long Sys_Tick;
-extern volatile unsigned char rx_cmd;  // Qt 수신 명령 ('1': 차단, '0': 복구)
-extern volatile unsigned char rx_flag; // 명령 수신 플래그
+extern volatile unsigned long g_sys_tick;
+extern volatile unsigned char g_rx_cmd;  // Qt 수신 명령 ('1': 차단, '0': 복구)
+extern volatile unsigned char g_rx_flag; // 명령 수신 플래그
 
 static unsigned char g_valve_state = 0; // 밸브 상태 (1: 차단/환기, 0: 정상/개방)
 
@@ -40,21 +40,21 @@ static void Sys_Init(int baud)
     Clock_Init();
     Uart2_Init(baud);
     setvbuf(stdout, NULL, _IONBF, 0);
-
-    Barrier_LED_Init(); // PB0, PB1 차단벽 LED 초기화
-    Motor_Init();       // PC0, PC1 L298N 모터 초기화
 }
 
 void Main(void)
 {
     unsigned short adc_val;
-    unsigned long cur_tick = 0L;
+    unsigned long last_sensor_tick = 0L;
 
     Sys_Init(115200);
     printf("\n=== Smart Monitoring System ===\n");
 
     TIM4_Init();
     ADC1_Init();
+    Barrier_LED_Init();
+    Motor_Init();
+
     Uart2_RX_Interrupt_Enable(1);
 
     // 초기 상태: 정상 개방 (LED 소등, 모터 정지)
@@ -65,19 +65,19 @@ void Main(void)
     for (;;)
     {
         // 1. Qt 원격 제어 명령 비동기 처리
-        if (rx_flag)
+        if (g_rx_flag)
         {
-            Process_Command(rx_cmd);
-            rx_flag = 0;
+            Process_Command(g_rx_cmd);
+            g_rx_flag = 0;
         }
 
-        // 2. Non-blocking 100ms 주기로 가스 센서 데이터 전송
-        if ((Sys_Tick - cur_tick) < 100)
-            continue;
+        // 2. Non-blocking 200ms 주기로 가스 센서 데이터 전송
+        if ((g_sys_tick - last_sensor_tick) >= 200)
+        {
+            last_sensor_tick = g_sys_tick;
 
-        cur_tick = Sys_Tick;
-
-        adc_val = ADC1_Read();
-        printf("%d\n", adc_val);
+            adc_val = ADC1_Read();
+            printf("%d\n", adc_val);
+        }
     }
 }

@@ -52,10 +52,13 @@ class TcpSocketClient(
                 val newSocket = Socket()
                 newSocket.connect(InetSocketAddress(ip, port), 5000)
 
+                val outStream = newSocket.getOutputStream()
+                val inStream = newSocket.getInputStream()
+
                 socket = newSocket
-                outputStream = newSocket.getOutputStream()
-                writer = PrintWriter(outputStream, true)
-                reader = BufferedReader(InputStreamReader(newSocket.getInputStream()))
+                outputStream = outStream
+                writer = PrintWriter(outStream, true)
+                reader = BufferedReader(InputStreamReader(inStream))
 
                 _events.emit(SocketEvent.Connected(ip, port))
                 startReceiveLoop()

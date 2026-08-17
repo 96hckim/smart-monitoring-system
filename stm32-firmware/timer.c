@@ -1,7 +1,7 @@
 #include "device_driver.h"
 #include "timer.h"
 
-volatile unsigned long Sys_Tick = 0;
+volatile unsigned long g_sys_tick = 0;
 
 void Timer_Init(void)
 {
