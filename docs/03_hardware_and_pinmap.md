@@ -105,8 +105,7 @@ $$T_{\text{total}} = \frac{492}{16\text{ MHz}} = 30.75\mu\text{s}$$
 
 
 * **전압 변환 수식**:
-
-$$V_{\text{sensor}} = \frac{\text{ADC\_Value}}{4095} \times 3.3\text{ V}$$
+  $$V_{\mathrm{sensor}} = \frac{\mathrm{ADC\_Value}}{4095} \times 3.3\,\mathrm{V}$$
 
 
 
@@ -231,21 +230,21 @@ $$I_F = \frac{3.3\text{ V} - 2.0\text{ V}}{220\Omega} \approx 5.9\text{ mA} \qua
 ### 7.1 종합 배선 결선 명세표
 
 | 구분 | 장치명 | 장치 핀 / 와이어 | Nucleo 연결 핀 | 기능 및 비고 |
-| --- | --- | --- | --- | --- |
+| :--- | :--- | :--- | :---: | :--- |
 | **센서** | 가변저항 모듈 | VCC | `+3V3` | 아날로그 기준 전원 |
-|  |  | GND | `GND` | 아날로그 접지 |
-|  |  | OUT | `PA6` | ADC1 Channel 6 아날로그 입력 |
-| **서보** | SG90 서보 모터 | VCC (Red) | `5V` | $470\mu\text{F}$ 캐패시터 병렬 연결 |
-|  |  | GND (Brown) | `GND` | 공통 접지 |
-|  |  | PWM (Orange) | `PA0` | TIM2_CH1 PWM 신호 |
-| **DC 팬** | 모터 드라이버 | VCC / VM | `5V` | $100\mu\text{F}$ 캐패시터 병렬 연결 |
-|  |  | GND | `GND` | 공통 접지 |
-|  |  | IN1 | `PC0` | DC 팬 정회전 제어 |
-|  |  | IN2 | `PC1` | DC 팬 정지 제어 |
-|  |  | OUT1, OUT2 | DC 모터 단자 | 팬 모터 전원 출력 |
-| **LED** | 차단벽 LED 1 | Anode (+) | `PB0` | $220\Omega$ 저항 직렬 연결 |
-|  |  | Cathode (-) | `GND` | 공통 접지 |
-|  | 차단벽 LED 2 | Anode (+) | `PB1` | $220\Omega$ 저항 직렬 연결 |
-|  |  | Cathode (-) | `GND` | 공통 접지 |
-| **키 스위치** | 수동 차단 키 (KEY1) | Switch 단자 | `PB4` | 내부 풀업, Active-Low (GND 연결) |
-|  | 수동 복구 키 (KEY2) | Switch 단자 | `PB5` | 내부 풀업, Active-Low (GND 연결) |
+| | | GND | `GND` | 아날로그 접지 |
+| | | OUT | `PA6` | ADC1 Channel 6 아날로그 입력 |
+| **서보** | SG90 서보 모터 | VCC (Red) | `5V` | 470uF 캐패시터 병렬 연결 |
+| | | GND (Brown) | `GND` | 공통 접지 |
+| | | PWM (Orange) | `PA0` | TIM2_CH1 PWM 신호 |
+| **DC 팬** | 모터 드라이버 | VCC / VM | `5V` | 100uF 캐패시터 병렬 연결 |
+| | | GND | `GND` | 공통 접지 |
+| | | IN1 | `PC0` | DC 팬 정회전 제어 |
+| | | IN2 | `PC1` | DC 팬 정지 제어 |
+| | | OUT1, OUT2 | DC 모터 단자 | 팬 모터 전원 출력 |
+| **LED** | 차단벽 LED 1 | Anode (+) | `PB0` | 220Ω 저항 직렬 연결 |
+| | | Cathode (-) | `GND` | 공통 접지 |
+| | 차단벽 LED 2 | Anode (+) | `PB1` | 220Ω 저항 직렬 연결 |
+| | | Cathode (-) | `GND` | 공통 접지 |
+| **키 스위치** | 수동 차단 키 (KEY1) | 단자 1 (Signal)<br>단자 2 (Ground) | `PB4`<br>`GND` | 내부 풀업, Active-Low (누르면 GND 연결) |
+| | 수동 복구 키 (KEY2) | 단자 1 (Signal)<br>단자 2 (Ground) | `PB5`<br>`GND` | 내부 풀업, Active-Low (누르면 GND 연결) |
