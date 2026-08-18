@@ -169,18 +169,23 @@ cd android
 
 ---
 
+전체 8개 문서 구성(`01` ~ `08`)에 맞추고, 외부 검색 링크 없이 **GitHub 저장소 내부의 상대 경로(`docs/...`)로 정확히 연결**되도록 수정한 `README.md`의 **8장 상세 기술 문서 (Docs)** 섹션입니다.
+
+---
+
 ## 📚 상세 기술 문서 (Docs)
 
 시스템의 세부 설계 및 구현 명세는 `docs/` 디렉터리의 기술 문서를 참고하십시오.
 
 | 번호 | 문서명 | 주요 내용 |
-| --- | --- | --- |
-| **01** | [시스템 아키텍처 정의서](https://www.google.com/search?q=docs/01_system_architecture.md) | 3계층 구조, Tailscale/Hotspot 네트워크 토폴로지, Mermaid 시퀀스 다이어그램 |
-| **02** | [통신 프로토콜 명세서](https://www.google.com/search?q=docs/02_protocol_specification.md) | UART ASCII 및 TCP 4바이트 길이 헤더 프레이밍 규격 |
-| **03** | [하드웨어 사양 및 핀맵](https://www.google.com/search?q=docs/03_hardware_and_pinmap.md) | MCU 핀맵, 액추에이터 구동 회로, 전원 노이즈 및 Star Ground 설계 |
-| **04** | [STM32 펌웨어 드라이버 가이드](https://www.google.com/search?q=docs/04_firmware_driver_guide.md) | 96MHz 클럭 트리, ADC1, TIM2 PWM, USART2, 소프트웨어 인터록 |
-| **05** | [Qt 관제 서버 아키텍처](https://www.google.com/search?q=docs/05_qt_control_center.md) | 시그널-슬롯 비동기 중계, 슬라이딩 차트, INI/CSV 데이터 로깅 |
-| **06** | [시스템 설치 및 운용 가이드](https://www.google.com/search?q=docs/06_setup_and_operation_guide.md) | 개발 환경 구축, MSYS2 패키지 설치, 4단계 통합 검증 시나리오 |
-| **07** | [트러블슈팅 및 기술 FAQ](https://www.google.com/search?q=docs/07_troubleshooting_and_faq.md) | 전압 강하, 통신 타임아웃, 메모리 누수 방어 등 문제 해결 가이드 |
+| :---: | :--- | :--- |
+| **01** | [01_system_architecture.md](./docs/01_system_architecture.md) | 3계층 통합 아키텍처, Tailscale/Hotspot 네트워크 토폴로지, Mermaid 시퀀스 다이어그램 |
+| **02** | [02_protocol_specification.md](./docs/02_protocol_specification.md) | UART ASCII 및 TCP 4바이트 Big-Endian 길이 헤더 프레이밍 규격 |
+| **03** | [03_hardware_and_pinmap.md](./docs/03_hardware_and_pinmap.md) | MCU 핀맵(PA6, PA0, PC0/1, PB0/1, PB4/5), 액추에이터 회로 및 전원 무결성 설계 |
+| **04** | [04_firmware_driver_guide.md](./docs/04_firmware_driver_guide.md) | 96MHz PLL 클럭 트리, ADC1, TIM2 PWM, USART2, 소프트웨어 인터록 |
+| **05** | [05_qt_control_center.md](./docs/05_qt_control_center.md) | 시그널-슬롯 비동기 중계, 슬라이딩 시계열 차트, INI/CSV 데이터 영속화 |
+| **06** | [06_android_streaming_client.md](./docs/06_android_streaming_client.md) | CameraX NV21-to-JPEG 파이프라인, 코루틴 비동기 소켓, Jetpack Compose UI |
+| **07** | [07_troubleshooting_log.md](./docs/07_troubleshooting_log.md) | 모터 서지 전압 강하, 패킷 단편화, 카메라 지연 해결 및 엔지니어링 의사결정 기록 |
+| **08** | [08_setup_and_operation_guide.md](./docs/08_setup_and_operation_guide.md) | 개발 환경 구축, MSYS2 필수 패키지 설치, 빌드/플래싱 및 4단계 검증 시나리오 |
 
 ---
