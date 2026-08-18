@@ -64,6 +64,14 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 저장된 설정 로드 및 UI/시스템 반영
     loadAndApplySettings();
+
+    if (ui->cbPortList) {
+        // [신규 추가] cbPortList의 클릭 이벤트를 감지하기 위해 이벤트 필터를 설치합니다.
+        ui->cbPortList->installEventFilter(this);
+
+        // [신규 추가] 사용 가능한 시리얼 포트 목록을 스캔하여 콤보박스에 채웁니다.
+        updatePortList();
+    }
 }
 
 MainWindow::~MainWindow()
@@ -374,5 +382,58 @@ void MainWindow::onSerialConnectionChanged(bool isConnected)
     }
     if (ui->cbBaudRate) {
         ui->cbBaudRate->setEnabled(!isConnected);
+    }
+}
+
+// ---------------------------------------------------------
+// [신규 추가] 이벤트 필터: cbPortList 마우스 클릭 감지 시 동작
+// ---------------------------------------------------------
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    // 1. 이벤트가 발생한 대상이 cbPortList인지 확인
+    // 2. 발생한 이벤트 종류가 마우스 클릭(MouseButtonPress)인지 확인
+    if (watched == ui->cbPortList && event->type() == QEvent::MouseButtonPress) {
+
+        // 3. 시리얼 포트가 현재 연결되어 있지 않은(미연결) 상태에서만 포트 목록을 갱신
+        if (m_serialManager && !m_serialManager->isConnected()) {
+            updatePortList();
+        }
+    }
+
+    // 다른 기본 Qt UI 이벤트(마우스 이동, 키 입력 등)는 정상 처리되도록 부모 클래스 함수 호출
+    return QMainWindow::eventFilter(watched, event);
+}
+
+// ---------------------------------------------------------
+// [신규 추가] 시리얼 포트 목록 동적 스캔 및 UI 갱신 함수
+// ---------------------------------------------------------
+void MainWindow::updatePortList()
+{
+    if (!ui->cbPortList || !m_serialManager)
+        return;
+
+    // 1. 기존 선택되어 있던 항목 백업
+    QString currentText = ui->cbPortList->currentText();
+
+    // 2. 기존 항목 초기화
+    ui->cbPortList->clear();
+
+    // 3. 현재 검색된 시리얼 포트 목록 가져오기
+    QStringList ports = m_serialManager->availablePorts();
+
+    // [신규 추가] 선택 가능한 포트가 없으면 COM1 ~ COM10을 리스트에 기본 추가
+    if (ports.isEmpty()) {
+        for (int i = 1; i <= 10; ++i) {
+            ports.append(QString("COM%1").arg(i));
+        }
+    }
+
+    // 4. 콤보박스에 포트 리스트 추가
+    ui->cbPortList->addItems(ports);
+
+    // 5. 이전에 선택했던 포트명이 새 리스트에 존재하면 선택 상태 복원
+    int idx = ui->cbPortList->findText(currentText);
+    if (idx != -1) {
+        ui->cbPortList->setCurrentIndex(idx);
     }
 }

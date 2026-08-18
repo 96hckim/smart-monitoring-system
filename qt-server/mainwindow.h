@@ -39,6 +39,8 @@ protected:
     // 프로그램 종료 시 설정 자동 저장을 위한 이벤트
     void closeEvent(QCloseEvent* event) override;
 
+    // 추가: 콤보박스 클릭 감지를 위한 이벤트 필터
+    bool eventFilter(QObject *watched, QEvent *event) override;
 private slots:
     // TCP 스트리밍 & 원격 제어 슬롯
     void on_btnStartServer_clicked();
@@ -64,6 +66,7 @@ private:
     QString getLocalIPAddress();
     void updateStatusBadge(bool isDanger);
     void logGasDataToCsv(int adcValue, int threshold, bool isDanger);
+    void updatePortList(); // 추가: 시리얼 포트 목록 동적 갱신 함수
 
     // 설정 관리 헬퍼 함수
     void loadAndApplySettings();
