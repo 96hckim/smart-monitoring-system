@@ -57,6 +57,24 @@ graph TD
 | **`SettingsManager`** | • 시스템 설정(`config.ini`) 로드 및 디스크 동기화<br>• 비정상 수치 방어 및 기본값 보정 | `QSettings`, C++11 위임 생성자 |
 | **`Logger`** | • `[시각][카테고리][레벨] 메시지` 표준 포맷 생성 | Static Utility Class, `QDateTime` |
 
+### 1.2 관제 대시보드 UI 및 상태 전이 화면
+
+<div align="center">
+  <table style="width: 100%; border: none;">
+    <tr>
+      <td align="center" width="50%">
+        <img src="../images/qt_normal.png" width="100%" alt="Qt 관제 정상 상태" /><br>
+        <b>🟢 정상 운용 상태 (가스: 1265, 상태 배지: 정상)</b>
+      </td>
+      <td align="center" width="50%">
+        <img src="../images/qt_danger.png" width="100%" alt="Qt 관제 위험 상태" /><br>
+        <b>🔴 위험 감지 및 자동 차단 (가스: 3551, 상태 배지: 위험)</b>
+      </td>
+    </tr>
+  </table>
+  <p><b>[그림] 가스 농도에 따른 관제 대시보드 UI 상태 전이 (실시간 영상, 슬라이딩 차트, 통신 로그 동기화)</b></p>
+</div>
+
 ---
 
 ## 2. 시그널-슬롯 기반 비동기 이벤트 라우팅

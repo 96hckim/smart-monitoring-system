@@ -272,6 +272,22 @@ private fun observeSocketEvents() {
 +-------------------------------------------------------------+
 ```
 
+<div align="center">
+  <table style="width: 100%; border: none;">
+    <tr>
+      <td align="center" width="50%">
+        <img src="../images/android_app_camera.png" width="80%" alt="CameraX 실시간 프리뷰 및 네트워크" /><br>
+        <b>📹 [상단부] CameraX 영상 송출 및 Tailscale VPN 연결</b>
+      </td>
+      <td align="center" width="50%">
+        <img src="../images/android_app_control.png" width="80%" alt="가스 제어 및 시스템 로그" /><br>
+        <b>🎛️ [하단부] 실시간 가스 텔레메트리, 원격 밸브 제어 및 로그</b>
+      </td>
+    </tr>
+  </table>
+  <p><b>[그림] Jetpack Compose 기반 Android 단일 화면 UI 분할 구성</b></p>
+</div>
+
 1. **`CameraSection`**: CameraX `PreviewView`를 `AndroidView`로 래핑하여 3:4 화면 비율 유지 및 LIVE 상태 칩 표시.
 2. **`ConnectionSection`**: 서버 IP/Port 입력 및 단일 토글 연결 버튼.
 3. **`GasControlSection`**: 실시간 가스 농도 수치 및 DANGER/NORMAL 동적 색상 배지, 원격 밸브 차단/복구 제어 버튼.
