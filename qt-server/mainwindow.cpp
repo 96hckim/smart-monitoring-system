@@ -1,6 +1,22 @@
 ﻿#include "mainwindow.h"
+#include "chartmanager.h"
 #include "logger.h"
+#include "serialmanager.h"
+#include "settingsmanager.h"
+#include "tcpstreamserver.h"
 #include "ui_mainwindow.h"
+
+#include <QCloseEvent>
+#include <QDateTime>
+#include <QDesktopServices>
+#include <QDir>
+#include <QEvent>
+#include <QFile>
+#include <QFileDialog>
+#include <QNetworkInterface>
+#include <QSignalBlocker>
+#include <QTextStream>
+#include <QUrl>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -8,18 +24,14 @@ MainWindow::MainWindow(QWidget* parent)
     , m_streamServer(new TcpStreamServer(this))
     , m_serialManager(new SerialManager(this))
     , m_chartManager(new ChartManager(this))
-    , m_settingsManager(std::make_unique<SettingsManager>())
+    , m_settingsManager(std::make_unique<SettingsManager>("config.ini"))
     , m_currentThreshold(3000)
     , m_saveDirPath("./logs")
     , m_isValveClosed(false)
 {
     ui->setupUi(this);
 
-    // 창 크기 최적화 (세로 스마트폰 영상 비율 고려)
-    resize(720, 900);
-    setMinimumSize(680, 800);
-
-    // UI 기본값 초기화
+    // UI 기본 위젯 초기화
     if (ui->lblServerIp) {
         ui->lblServerIp->setText(QString("IP: %1").arg(getLocalIPAddress()));
     }
@@ -32,11 +44,8 @@ MainWindow::MainWindow(QWidget* parent)
         ui->cbBaudRate->setCurrentText("115200");
     }
     if (ui->cbPortList) {
-        QStringList ports = m_serialManager->availablePorts();
-        if (!ports.isEmpty()) {
-            ui->cbPortList->clear();
-            ui->cbPortList->addItems(ports);
-        }
+        ui->cbPortList->installEventFilter(this);
+        updatePortList();
     }
 
     // TCP 스트림 서버 시그널 연동
@@ -50,7 +59,7 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_serialManager, &SerialManager::statusMessage, this, &MainWindow::onSerialStatusMessage);
     connect(m_serialManager, &SerialManager::connectionStateChanged, this, &MainWindow::onSerialConnectionChanged);
 
-    // 차트 및 임계값 컨트롤 초기화
+    // 실시간 차트 및 임계값 컨트롤 초기화
     if (ui->chartView) {
         m_chartManager->initChart(ui->chartView);
         m_chartManager->setThreshold(m_currentThreshold);
@@ -61,17 +70,7 @@ MainWindow::MainWindow(QWidget* parent)
     }
 
     updateStatusBadge(false);
-
-    // 저장된 설정 로드 및 UI/시스템 반영
     loadAndApplySettings();
-
-    if (ui->cbPortList) {
-        // [신규 추가] cbPortList의 클릭 이벤트를 감지하기 위해 이벤트 필터를 설치합니다.
-        ui->cbPortList->installEventFilter(this);
-
-        // [신규 추가] 사용 가능한 시리얼 포트 목록을 스캔하여 콤보박스에 채웁니다.
-        updatePortList();
-    }
 }
 
 MainWindow::~MainWindow()
@@ -85,11 +84,51 @@ void MainWindow::closeEvent(QCloseEvent* event)
     event->accept();
 }
 
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    // 콤보박스 클릭 시 미연결 상태일 때만 포트 목록을 동적으로 재스캔
+    if (watched == ui->cbPortList && event->type() == QEvent::MouseButtonPress) {
+        if (m_serialManager && !m_serialManager->isConnected()) {
+            updatePortList();
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::updatePortList()
+{
+    if (!ui->cbPortList || !m_serialManager) {
+        return;
+    }
+
+    // UI 갱신 중 불필요한 currentIndexChanged 시그널 방지
+    const QSignalBlocker blocker(ui->cbPortList);
+
+    const QString currentText = ui->cbPortList->currentText();
+    ui->cbPortList->clear();
+
+    QStringList ports = m_serialManager->availablePorts();
+
+    // 인식된 포트가 없을 경우 기본 가상 포트(COM1~COM10) 목록 생성
+    if (ports.isEmpty()) {
+        for (int i = 1; i <= 10; ++i) {
+            ports.append(QString("COM%1").arg(i));
+        }
+    }
+
+    ui->cbPortList->addItems(ports);
+
+    // 이전 선택 포트가 새 목록에 존재하면 선택 유지
+    int idx = ui->cbPortList->findText(currentText);
+    if (idx != -1) {
+        ui->cbPortList->setCurrentIndex(idx);
+    }
+}
+
 void MainWindow::loadAndApplySettings()
 {
     AppSettings settings = m_settingsManager->loadSettings();
 
-    // 1. 임계값 및 자동 차단 설정 반영
     m_currentThreshold = settings.gasThreshold;
     if (ui->sbThreshold) {
         ui->sbThreshold->setValue(m_currentThreshold);
@@ -101,12 +140,10 @@ void MainWindow::loadAndApplySettings()
         ui->chkAutoClose->setChecked(settings.autoCloseEnabled);
     }
 
-    // 2. TCP 포트 설정 반영
     if (ui->lePort) {
         ui->lePort->setText(QString::number(settings.tcpPort));
     }
 
-    // 3. 시리얼 포트 및 보드레이트 반영
     if (ui->cbBaudRate) {
         ui->cbBaudRate->setCurrentText(QString::number(settings.serialBaudRate));
     }
@@ -117,7 +154,6 @@ void MainWindow::loadAndApplySettings()
         }
     }
 
-    // 4. 로깅 경로 및 활성화 여부 반영
     m_saveDirPath = settings.csvLogPath;
     if (ui->leLogPath) {
         ui->leLogPath->setText(m_saveDirPath);
@@ -131,18 +167,14 @@ void MainWindow::saveCurrentSettings()
 {
     AppSettings settings;
 
-    // 1. Safety
     settings.gasThreshold = m_currentThreshold;
     settings.autoCloseEnabled = ui->chkAutoClose ? ui->chkAutoClose->isChecked() : true;
 
-    // 2. Serial
     settings.serialPortName = ui->cbPortList ? ui->cbPortList->currentText() : "";
     settings.serialBaudRate = ui->cbBaudRate ? ui->cbBaudRate->currentText().toInt() : 115200;
 
-    // 3. Network
     settings.tcpPort = ui->lePort ? ui->lePort->text().toInt() : 8080;
 
-    // 4. Logging
     settings.csvSaveEnabled = ui->chkEnableLogging ? ui->chkEnableLogging->isChecked() : true;
     settings.csvLogPath = m_saveDirPath;
 
@@ -164,19 +196,22 @@ void MainWindow::on_btnStartServer_clicked()
 {
     if (ui->btnStartServer->text() == "서버 시작") {
         quint16 port = ui->lePort ? ui->lePort->text().toUShort() : 8080;
-        if (port == 0)
+        if (port == 0) {
             port = 8080;
+        }
 
         if (m_streamServer->startServer(port)) {
             ui->btnStartServer->setText("서버 중지");
-            if (ui->lePort)
+            if (ui->lePort) {
                 ui->lePort->setEnabled(false);
+            }
         }
     } else {
         m_streamServer->stopServer();
         ui->btnStartServer->setText("서버 시작");
-        if (ui->lePort)
+        if (ui->lePort) {
             ui->lePort->setEnabled(true);
+        }
         onClientCountChanged(0);
     }
 }
@@ -233,7 +268,6 @@ void MainWindow::on_btnValveOpen_clicked()
     }
 }
 
-// 실시간 가스 데이터 수신 및 위험 감지/자동 제어
 void MainWindow::onGasDataReceived(int adcValue)
 {
     if (ui->lblGasVal) {
@@ -252,7 +286,7 @@ void MainWindow::onGasDataReceived(int adcValue)
     logGasDataToCsv(adcValue, m_currentThreshold, isDanger);
     updateStatusBadge(isDanger);
 
-    // 임계값 초과 시 자동 밸브 차단 (단일 트리거 래치 적용)
+    // 임계값 초과 시 단일 트리거 래치 기반 자동 차단
     if (ui->chkAutoClose && ui->chkAutoClose->isChecked() && isDanger) {
         if (!m_isValveClosed) {
             if (m_serialManager->sendChar('1')) {
@@ -279,12 +313,14 @@ void MainWindow::onValveCommandFromClient(char cmd)
 
 void MainWindow::on_btnApplyThreshold_clicked()
 {
-    if (!ui->sbThreshold)
+    if (!ui->sbThreshold) {
         return;
+    }
 
     int inputVal = ui->sbThreshold->value();
-    if (m_currentThreshold == inputVal)
+    if (m_currentThreshold == inputVal) {
         return;
+    }
 
     m_currentThreshold = inputVal;
 
@@ -323,8 +359,9 @@ void MainWindow::on_btnOpenFolder_clicked()
 
 void MainWindow::logGasDataToCsv(int adcValue, int threshold, bool isDanger)
 {
-    if (ui->chkEnableLogging && !ui->chkEnableLogging->isChecked())
+    if (ui->chkEnableLogging && !ui->chkEnableLogging->isChecked()) {
         return;
+    }
 
     QDir dir(m_saveDirPath);
     if (!dir.exists()) {
@@ -354,8 +391,9 @@ void MainWindow::logGasDataToCsv(int adcValue, int threshold, bool isDanger)
 
 void MainWindow::updateStatusBadge(bool isDanger)
 {
-    if (!ui->lblStatusBadge)
+    if (!ui->lblStatusBadge) {
         return;
+    }
 
     if (isDanger) {
         ui->lblStatusBadge->setText("위 험");
@@ -382,58 +420,5 @@ void MainWindow::onSerialConnectionChanged(bool isConnected)
     }
     if (ui->cbBaudRate) {
         ui->cbBaudRate->setEnabled(!isConnected);
-    }
-}
-
-// ---------------------------------------------------------
-// [신규 추가] 이벤트 필터: cbPortList 마우스 클릭 감지 시 동작
-// ---------------------------------------------------------
-bool MainWindow::eventFilter(QObject* watched, QEvent* event)
-{
-    // 1. 이벤트가 발생한 대상이 cbPortList인지 확인
-    // 2. 발생한 이벤트 종류가 마우스 클릭(MouseButtonPress)인지 확인
-    if (watched == ui->cbPortList && event->type() == QEvent::MouseButtonPress) {
-
-        // 3. 시리얼 포트가 현재 연결되어 있지 않은(미연결) 상태에서만 포트 목록을 갱신
-        if (m_serialManager && !m_serialManager->isConnected()) {
-            updatePortList();
-        }
-    }
-
-    // 다른 기본 Qt UI 이벤트(마우스 이동, 키 입력 등)는 정상 처리되도록 부모 클래스 함수 호출
-    return QMainWindow::eventFilter(watched, event);
-}
-
-// ---------------------------------------------------------
-// [신규 추가] 시리얼 포트 목록 동적 스캔 및 UI 갱신 함수
-// ---------------------------------------------------------
-void MainWindow::updatePortList()
-{
-    if (!ui->cbPortList || !m_serialManager)
-        return;
-
-    // 1. 기존 선택되어 있던 항목 백업
-    QString currentText = ui->cbPortList->currentText();
-
-    // 2. 기존 항목 초기화
-    ui->cbPortList->clear();
-
-    // 3. 현재 검색된 시리얼 포트 목록 가져오기
-    QStringList ports = m_serialManager->availablePorts();
-
-    // [신규 추가] 선택 가능한 포트가 없으면 COM1 ~ COM10을 리스트에 기본 추가
-    if (ports.isEmpty()) {
-        for (int i = 1; i <= 10; ++i) {
-            ports.append(QString("COM%1").arg(i));
-        }
-    }
-
-    // 4. 콤보박스에 포트 리스트 추가
-    ui->cbPortList->addItems(ports);
-
-    // 5. 이전에 선택했던 포트명이 새 리스트에 존재하면 선택 상태 복원
-    int idx = ui->cbPortList->findText(currentText);
-    if (idx != -1) {
-        ui->cbPortList->setCurrentIndex(idx);
     }
 }
