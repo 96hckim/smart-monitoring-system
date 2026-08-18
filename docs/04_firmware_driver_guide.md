@@ -21,7 +21,7 @@
 본 펌웨어는 상용 RTOS나 제조사 HAL 라이브러리 없이, 레지스터 직접 제어(CMSIS 헤더 + 비트 연산 매크로)로 구현된 **비동기 이벤트 드리븐 베어메탈 구조**를 갖습니다.
 
 * **인터럽트 최소화 원칙**: ISR 내부에서는 플래그 설정과 단일 바이트 버퍼링만 수행하고, 실제 연산 및 하드웨어 구동은 메인 루프에서 처리하여 인터럽트 지연(Latency)을 최소화합니다.
-* **논블로킹 타이밍 스케줄링**: TIM4 1ms 하드웨어 인터럽트로 갱신되는 `Sys_Tick` 카운터를 기반으로 메인 루프가 100ms 주기로 가스 센서를 계측하고 UART로 전송합니다.
+* **논블로킹 타이밍 스케줄링**: TIM4 1ms 하드웨어 인터럽트로 갱신되는 `Sys_Tick` 카운터를 기반으로 메인 루프가 **200ms** 주기로 가스 센서를 계측하고 UART로 전송합니다.
 
 ```mermaid
 flowchart TD
@@ -44,7 +44,7 @@ flowchart TD
     
     J --> K
     K -- Yes --> L["수신 명령('1'/'0') 파싱 및 상태 갱신<br>(Valve_Set_State)"]
-    K -- No --> M{"100ms 경과?<br>(Sys_Tick >= 100)"}
+    K -- No --> M{"200ms 경과?<br>(Sys_Tick >= 200)"}
     
     L --> M
     M -- Yes --> N["ADC1_Read(PA6) 계측<br>UART 'adc_val\n' 전송"]
@@ -83,17 +83,14 @@ FLASH->ACR = (1 << 10) | (1 << 9) | (1 << 8) | (0x3 << 0);
 
 
 2. **PLL 체배비 설정 (`RCC->PLLCFGR`)**:
-
-$$f_{\text{VCO}} = 16\text{ MHz} \times \frac{\text{PLLN}(192)}{\text{PLLM}(8)} = 384\text{ MHz}$$
-
-
-$$f_{\text{SYSCLK}} = \frac{f_{\text{VCO}}}{\text{PLLP}(4)} = \frac{384\text{ MHz}}{4} = 96\text{ MHz}$$
+* VCO 주파수: `16MHz * (192 / 8) = 384MHz`
+* 시스템 클럭: `384MHz / 4 = 96MHz`
 
 
 3. **버스 분주비 설정 (`RCC->CFGR`)**:
-* AHB Prescaler = `/1` ($HCLK = 96\text{MHz}$)
-* APB1 Prescaler = `/2` ($PCLK1 = 48\text{MHz}$, 저속 주변장치 제한 50MHz 준수)
-* APB2 Prescaler = `/1` ($PCLK2 = 96\text{MHz}$)
+* AHB Prescaler = `/1` (`HCLK = 96MHz`)
+* APB1 Prescaler = `/2` (`PCLK1 = 48MHz`, 저속 주변장치 제한 50MHz 준수)
+* APB2 Prescaler = `/1` (`PCLK2 = 96MHz`)
 
 
 
@@ -166,10 +163,10 @@ unsigned short ADC1_Read(void)
 
 ### 4.1 TIM4 시스템 틱 타이머 (1ms)
 
-* **타이머 입력 클럭**: $96\text{MHz}$ (APB1 x2)
-* **프리스케일러 (PSC)**: $960 - 1$ ($1\text{ tick} = 10\mu\text{s}$)
-* **주기 (ARR)**: $100 - 1$ ($10\mu\text{s} \times 100 = 1\text{ms}$)
-* **인터럽트**: 매 1ms마다 `TIM4_IRQHandler`가 호출되어 `Sys_Tick++` 수행.
+* **타이머 입력 클럭**: 96MHz (APB1 x2)
+* **프리스케일러 (PSC)**: `960 - 1` (1 tick = 10µs)
+* **주기 (ARR)**: `100 - 1` (10µs * 100 = 1ms)
+* **인터럽트**: 매 1ms마다 `TIM4_IRQHandler`가 호출되어 `Sys_Tick++` 수행. 메인 루프에서 `Sys_Tick >= 200`을 검사하여 **200ms** 계측 주기를 유지.
 
 ---
 
@@ -224,14 +221,10 @@ PC 관제 게이트웨이(Qt)와의 통신을 담당하는 USART2 드라이버�
 
 * **물리 핀**: `PA2` (TX, AF7), `PA3` (RX, AF7)
 * **보드레이트 계산 (PCLK1 = 48MHz)**:
-
-$$\text{USARTDIV} = \frac{48\times 10^6}{16 \times 115200} \approx 26.0416$$
-
-
-$$\text{DIV\_Mantissa} = 26 = \text{0x1A}, \quad \text{DIV\_Fraction} = 0.0416 \times 16 \approx 1 = \text{0x1}$$
-
-
-$$\text{USART2->BRR} = \text{0x01A1}$$
+* `USARTDIV = 48,000,000 / (16 * 115200) ≈ 26.0416`
+* `DIV_Mantissa = 26 = 0x1A`
+* `DIV_Fraction = 0.0416 * 16 ≈ 1 = 0x1`
+* `USART2->BRR = 0x01A1`
 
 
 
