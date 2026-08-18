@@ -1,11 +1,3 @@
-이 명령어는 **`06_setup_and_operation_guide.md`(상세 환경 구축 가이드)에 자세한 단계로 포함하는 것이 가장 적합**하며, 최상위 `README.md`의 Quick Start 섹션에도 한 줄 요약으로 함께 기재해 두는 것이 좋습니다.
-
-Windows에서 MSYS2(UCRT64) 환경으로 Qt 프로젝트를 빌드할 때 `QSerialPort`와 `QtCharts`는 기본 Qt 패키지에 포함되지 않아 컴파일 에러(`Project ERROR: Unknown module(s) in QT: serialport charts`)가 자주 발생하는 핵심 의존성 패키지이기 때문입니다.
-
-해당 MSYS2 의존성 설치 명령어를 1장(요구사항) 및 2.2절(Qt 서버 빌드)에 명확히 반영한 **`06_setup_and_operation_guide.md` 수정본**입니다.
-
----
-
 # 시스템 설치 및 운용 가이드 (Setup & Operation Guide v1.0)
 
 본 문서는 **스마트 가스 모니터링 시스템**을 구성하는 3계층(STM32 베어메탈 펌웨어, Qt 데스크톱 관제 서버, Android 모바일 클라이언트)의 개발 환경 구축, 필수 의존성 패키지 설치, 소스 코드 빌드 및 플래싱, 네트워크 구성, 그리고 실제 운용 및 테스트 절차를 정의합니다.
