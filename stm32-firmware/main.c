@@ -3,6 +3,7 @@
 #include "adc.h"
 #include "led.h"
 #include "motor.h"
+#include "key.h"
 #include <stdio.h>
 
 extern volatile unsigned long g_sys_tick;
@@ -46,6 +47,7 @@ void Main(void)
 {
     unsigned short adc_val;
     unsigned long last_sensor_tick = 0L;
+    unsigned long last_key_tick = 0L;
 
     Sys_Init(115200);
     printf("\n=== Smart Monitoring System ===\n");
@@ -54,6 +56,7 @@ void Main(void)
     ADC1_Init();
     Barrier_LED_Init();
     Motor_Init();
+    Key_Init();
 
     Uart2_RX_Interrupt_Enable(1);
 
@@ -71,7 +74,23 @@ void Main(void)
             g_rx_flag = 0;
         }
 
-        // 2. Non-blocking 200ms 주기로 가스 센서 데이터 전송
+        // 2. Non-blocking 30ms 주기로 물리 스위치 입력 처리
+        if ((g_sys_tick - last_key_tick) >= 30)
+        {
+            last_key_tick = g_sys_tick;
+
+            KeyEvent evt = Key_Scan();
+            if (evt == KEY_EVENT_VALVE_CLOSE)
+            {
+                Valve_Set_State(1);
+            }
+            else if (evt == KEY_EVENT_VALVE_OPEN)
+            {
+                Valve_Set_State(0);
+            }
+        }
+
+        // 3. Non-blocking 200ms 주기로 가스 센서 데이터 전송
         if ((g_sys_tick - last_sensor_tick) >= 200)
         {
             last_sensor_tick = g_sys_tick;
