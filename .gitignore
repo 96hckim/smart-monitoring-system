@@ -75,3 +75,6 @@ stm32-firmware/**/*.su
 # IDE 설정 파일
 stm32-firmware/.settings/
 stm32-firmware/*.launch
+
+# Local Dump & Temporary text files
+__dump*.txt

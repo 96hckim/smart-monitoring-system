@@ -5,9 +5,12 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -125,18 +129,34 @@ fun MonitoringScreen(viewModel: MonitoringViewModel = viewModel()) {
         }
     }
 
-    val previewView = remember { PreviewView(context) }
+    val previewView = remember {
+        PreviewView(context).apply {
+            // 카메라 센서가 촬영하는 전체 영역을 잘림 없이 화면에 맞게 보여줌
+            scaleType = PreviewView.ScaleType.FIT_CENTER
+        }
+    }
 
     LaunchedEffect(hasCameraPermission, cameraSelector, isFlashEnabled) {
         if (hasCameraPermission) {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.surfaceProvider = previewView.surfaceProvider
-                }
+                val resolutionSelector = ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(
+                        AspectRatioStrategy(
+                            AspectRatio.RATIO_4_3,
+                            AspectRatioStrategy.FALLBACK_RULE_AUTO
+                        )
+                    )
+                    .build()
+                val preview = Preview.Builder()
+                    .setResolutionSelector(resolutionSelector)
+                    .build().also {
+                        it.surfaceProvider = previewView.surfaceProvider
+                    }
 
                 val imageAnalysis = ImageAnalysis.Builder()
+                    .setResolutionSelector(resolutionSelector)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
 
@@ -283,7 +303,7 @@ fun CameraSection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(280.dp)
+                    .aspectRatio(3f / 4f) // 가로 너비에 맞춰 3:4 비율로 높이를 자동 계산
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color.Black)
             ) {
