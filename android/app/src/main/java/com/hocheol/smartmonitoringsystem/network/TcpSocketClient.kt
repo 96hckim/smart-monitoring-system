@@ -48,7 +48,7 @@ class TcpSocketClient(
                 val newSocket = Socket()
                 newSocket.connect(InetSocketAddress(ip, port), 5000)
                 // 소켓 타임아웃 설정 (비정상 종료 감지 도움)
-                newSocket.soTimeout = 10000 
+                newSocket.soTimeout = 10000
 
                 val outStream = newSocket.getOutputStream()
                 val inStream = newSocket.getInputStream()
@@ -107,10 +107,14 @@ class TcpSocketClient(
                 try {
                     val os = outputStream ?: throw Exception("연결되지 않음")
                     val size = data.size
-                    os.write(byteArrayOf(
-                        (size ushr 24).toByte(), (size ushr 16).toByte(),
-                        (size ushr 8).toByte(), size.toByte()
-                    ))
+                    os.write(
+                        byteArrayOf(
+                            (size ushr 24).toByte(),
+                            (size ushr 16).toByte(),
+                            (size ushr 8).toByte(),
+                            size.toByte()
+                        )
+                    )
                     os.write(data)
                     os.flush()
                 } catch (e: Exception) {

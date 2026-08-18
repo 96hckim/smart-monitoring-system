@@ -104,8 +104,8 @@ class MonitoringViewModel : ViewModel() {
             socketClient.disconnect()
         } else {
             val portInt = _port.value.toIntOrNull() ?: 8080
-            socketClient.connect(_ip.value, portInt)
             addLog("서버 연결 시도 중...")
+            socketClient.connect(_ip.value, portInt)
         }
     }
 
@@ -156,7 +156,6 @@ class MonitoringViewModel : ViewModel() {
     }
 
     override fun onCleared() {
-        super.onCleared()
         socketClient.disconnect()
     }
 }

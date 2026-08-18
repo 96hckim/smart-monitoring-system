@@ -1,5 +1,5 @@
+#include "device_driver.h"
 #include "key.h"
-#include "macro.h"
 
 // 핀 번호 정의 (PB4: 밸브 차단, PB5: 밸브 복구)
 #define PIN_VALVE_CLOSE 4
