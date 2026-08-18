@@ -1,28 +1,11 @@
-# README.md
-
-```markdown
-<div align="center">
-
 # 🛡️ Smart Gas Monitoring & Safety Response System
+
 ### 스마트 산업용 가스 모니터링 및 실시간 원격 안전 차단 시스템
-
-[![STM32](https://img.shields.io/badge/STM32F411RE-ARM%20Cortex--M4-002B49?logo=stmicroelectronics)](https://www.st.com/)
-[![Bare-metal C](https://img.shields.io/badge/Firmware-Bare--metal%20C99-00599C?logo=c)](stm32-firmware/)
-[![Qt](https://img.shields.io/badge/Gateway-Qt%205%20%2F%20C%2B%2B17-41CD52?logo=qt)](qt-server/)
-[![Android](https://img.shields.io/badge/Client-Kotlin%20%2F%20Compose-3DDC84?logo=android)](android/)
-[![CameraX](https://img.shields.io/badge/Streaming-CameraX%201.4-FFA000?logo=google)](https://developer.android.com/training/camerax)
-[![Tailscale](https://img.shields.io/badge/Network-Tailscale%20VPN-4969ED?logo=tailscale)](https://tailscale.com/)
-
-<p align="center">
-  <b>96MHz 베어메탈 엣지 계측</b>부터 <b>Qt 데스크톱 게이트웨이</b>, <b>저지연 모바일 영상 스트리밍</b>까지<br>
-  산업 현장의 가스 누출을 200ms 주기로 감시하고 즉각적인 물리적 안전 조치를 실행하는 3계층 End-to-End 솔루션
-</p>
-
-</div>
 
 ---
 
 ## 📌 목차
+
 1. [프로젝트 개요](#-프로젝트-개요)
 2. [시스템 아키텍처 및 데이터 흐름](#-시스템-아키텍처-및-데이터-흐름)
 3. [핵심 엔지니어링 기능](#-핵심-엔지니어링-기능)
@@ -38,8 +21,6 @@
 
 본 프로젝트는 밀폐 공간 및 산업 현장에서 발생할 수 있는 가스 누출 위험을 실시간으로 감지하고, **위험 상황 시 물리 밸브 차단, 강제 환기, 시각 경보를 자율적/원격으로 동시 수행**하는 스마트 안전 관제 시스템입니다.
 
-![전체 시스템 하드웨어 셋업](images/hardware_setup.png)
-
 * **결정론적 엣지 제어**: 상용 RTOS/HAL 라이브러리를 배제하고 레지스터 직접 제어로 구축된 STM32 베어메탈 펌웨어를 통해 200ms 주기 고신뢰성 가스 계측 및 하드웨어 PWM 액추에이션을 수행합니다.
 * **중앙 집중식 게이트웨이**: Qt 기반 데스크톱 관제 서버가 시리얼(UART)과 네트워크(TCP)를 중계하며, 위험 수치 감지 시 단일 트리거 래치 방식으로 밸브를 자동 차단하고 실시간 시계열 그래프를 렌더링합니다.
 * **원격 모바일 관제 & CCTV 스트리밍**: 현장 점검자는 안드로이드 앱을 통해 현장 영상을 저지연으로 실시간 송출하고, Tailscale 오버레이 VPN을 통해 외부 LTE/5G 환경에서도 원격으로 현장을 감시 및 수동 제어합니다.
@@ -48,7 +29,7 @@
 
 ## 📐 시스템 아키텍처 및 데이터 흐름
 
-시스템은 **Edge Node(센서/액추에이터) $\leftrightarrow$ Gateway(데스크톱 관제) $\leftrightarrow$ Mobile Client(영상/원격 제어)**의 완벽한 3계층 구조로 분리되어 높은 응집도와 낮은 결합도를 유지합니다.
+시스템은 Edge Node(센서/액추에이터) $\leftrightarrow$ Gateway(데스크톱 관제) $\leftrightarrow$ Mobile Client(영상/원격 제어)의 완벽한 3계층 구조로 분리되어 높은 응집도와 낮은 결합도를 유지합니다.
 
 ```text
 [ 현장 작업자 / 모바일 클라이언트 ]
