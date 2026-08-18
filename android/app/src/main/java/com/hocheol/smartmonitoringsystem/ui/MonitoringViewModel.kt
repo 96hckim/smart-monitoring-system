@@ -19,7 +19,7 @@ class MonitoringViewModel : ViewModel() {
 
     private val socketClient = TcpSocketClient(viewModelScope)
 
-    private val _ip = MutableStateFlow("100.72.78.11")
+    private val _ip = MutableStateFlow("192.168.137.1")
     val ip = _ip.asStateFlow()
 
     private val _port = MutableStateFlow("8080")
