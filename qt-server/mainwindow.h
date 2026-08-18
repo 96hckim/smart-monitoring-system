@@ -2,9 +2,12 @@
 #define MAINWINDOW_H
 
 #include "chartmanager.h"
+#include "logger.h"
 #include "serialmanager.h"
+#include "settingsmanager.h"
 #include "tcpstreamserver.h"
 
+#include <QCloseEvent>
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
@@ -14,6 +17,7 @@
 #include <QNetworkInterface>
 #include <QTextStream>
 #include <QUrl>
+#include <memory>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -28,8 +32,12 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
+
+protected:
+    // 프로그램 종료 시 설정 자동 저장을 위한 이벤트
+    void closeEvent(QCloseEvent* event) override;
 
 private slots:
     // TCP 스트리밍 & 원격 제어 슬롯
@@ -57,11 +65,16 @@ private:
     void updateStatusBadge(bool isDanger);
     void logGasDataToCsv(int adcValue, int threshold, bool isDanger);
 
+    // 설정 관리 헬퍼 함수
+    void loadAndApplySettings();
+    void saveCurrentSettings();
+
 private:
     Ui::MainWindow* ui;
     TcpStreamServer* m_streamServer;
     SerialManager* m_serialManager;
     ChartManager* m_chartManager;
+    std::unique_ptr<SettingsManager> m_settingsManager;
 
     int m_currentThreshold = 3000;
     QString m_saveDirPath = "./logs";

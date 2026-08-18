@@ -8,11 +8,16 @@ MainWindow::MainWindow(QWidget* parent)
     , m_streamServer(new TcpStreamServer(this))
     , m_serialManager(new SerialManager(this))
     , m_chartManager(new ChartManager(this))
+    , m_settingsManager(std::make_unique<SettingsManager>())
     , m_currentThreshold(3000)
     , m_saveDirPath("./logs")
     , m_isValveClosed(false)
 {
     ui->setupUi(this);
+
+    // 창 크기 최적화 (세로 스마트폰 영상 비율 고려)
+    resize(720, 900);
+    setMinimumSize(680, 800);
 
     // UI 기본값 초기화
     if (ui->lblServerIp) {
@@ -32,9 +37,6 @@ MainWindow::MainWindow(QWidget* parent)
             ui->cbPortList->clear();
             ui->cbPortList->addItems(ports);
         }
-    }
-    if (ui->leLogPath) {
-        ui->leLogPath->setText(m_saveDirPath);
     }
 
     // TCP 스트림 서버 시그널 연동
@@ -59,11 +61,84 @@ MainWindow::MainWindow(QWidget* parent)
     }
 
     updateStatusBadge(false);
+
+    // 저장된 설정 로드 및 UI/시스템 반영
+    loadAndApplySettings();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    saveCurrentSettings();
+    event->accept();
+}
+
+void MainWindow::loadAndApplySettings()
+{
+    AppSettings settings = m_settingsManager->loadSettings();
+
+    // 1. 임계값 및 자동 차단 설정 반영
+    m_currentThreshold = settings.gasThreshold;
+    if (ui->sbThreshold) {
+        ui->sbThreshold->setValue(m_currentThreshold);
+    }
+    if (m_chartManager) {
+        m_chartManager->setThreshold(m_currentThreshold);
+    }
+    if (ui->chkAutoClose) {
+        ui->chkAutoClose->setChecked(settings.autoCloseEnabled);
+    }
+
+    // 2. TCP 포트 설정 반영
+    if (ui->lePort) {
+        ui->lePort->setText(QString::number(settings.tcpPort));
+    }
+
+    // 3. 시리얼 포트 및 보드레이트 반영
+    if (ui->cbBaudRate) {
+        ui->cbBaudRate->setCurrentText(QString::number(settings.serialBaudRate));
+    }
+    if (ui->cbPortList && !settings.serialPortName.isEmpty()) {
+        int idx = ui->cbPortList->findText(settings.serialPortName);
+        if (idx != -1) {
+            ui->cbPortList->setCurrentIndex(idx);
+        }
+    }
+
+    // 4. 로깅 경로 및 활성화 여부 반영
+    m_saveDirPath = settings.csvLogPath;
+    if (ui->leLogPath) {
+        ui->leLogPath->setText(m_saveDirPath);
+    }
+    if (ui->chkEnableLogging) {
+        ui->chkEnableLogging->setChecked(settings.csvSaveEnabled);
+    }
+}
+
+void MainWindow::saveCurrentSettings()
+{
+    AppSettings settings;
+
+    // 1. Safety
+    settings.gasThreshold = m_currentThreshold;
+    settings.autoCloseEnabled = ui->chkAutoClose ? ui->chkAutoClose->isChecked() : true;
+
+    // 2. Serial
+    settings.serialPortName = ui->cbPortList ? ui->cbPortList->currentText() : "";
+    settings.serialBaudRate = ui->cbBaudRate ? ui->cbBaudRate->currentText().toInt() : 115200;
+
+    // 3. Network
+    settings.tcpPort = ui->lePort ? ui->lePort->text().toInt() : 8080;
+
+    // 4. Logging
+    settings.csvSaveEnabled = ui->chkEnableLogging ? ui->chkEnableLogging->isChecked() : true;
+    settings.csvLogPath = m_saveDirPath;
+
+    m_settingsManager->saveSettings(settings);
 }
 
 QString MainWindow::getLocalIPAddress()
@@ -80,7 +155,7 @@ QString MainWindow::getLocalIPAddress()
 void MainWindow::on_btnStartServer_clicked()
 {
     if (ui->btnStartServer->text() == "서버 시작") {
-        quint16 port = ui->lePort->text().toUShort();
+        quint16 port = ui->lePort ? ui->lePort->text().toUShort() : 8080;
         if (port == 0)
             port = 8080;
 

@@ -11,6 +11,7 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     serialmanager.cpp \
+    settingsmanager.cpp \
     tcpstreamserver.cpp
 
 HEADERS += \
@@ -18,6 +19,7 @@ HEADERS += \
     logger.h \
     mainwindow.h \
     serialmanager.h \
+    settingsmanager.h \
     tcpstreamserver.h
 
 FORMS += \

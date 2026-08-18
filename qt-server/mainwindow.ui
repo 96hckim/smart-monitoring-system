@@ -6,18 +6,18 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>950</width>
+    <width>720</width>
     <height>900</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>850</width>
+    <width>680</width>
     <height>800</height>
    </size>
   </property>
   <property name="windowTitle">
-   <string>TcpMediaBridge - Server</string>
+   <string>Smart Monitoring Shield - Control Center</string>
   </property>
   <property name="styleSheet">
    <string notr="true">/* 메인 배경 및 기본 폰트 설정 */
@@ -749,7 +749,7 @@ padding: 8px;</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>950</width>
+     <width>720</width>
      <height>21</height>
     </rect>
    </property>
