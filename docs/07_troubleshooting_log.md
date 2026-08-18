@@ -38,7 +38,6 @@ $$\text{Timer Clock} = 2 \times \text{PCLK1} = 96\text{ MHz}$$
 ```text
 [정상 기대치] 1 tick = 1.0us  --> 1500 tick = 1500us (90도 회전)
 [실제 출력치] 1 tick = 0.5us  --> 1500 tick =  750us (45도 회전)
-
 ```
 
 ### 1.3 해결 및 엔지니어링 의사결정
@@ -63,7 +62,6 @@ void TIM2_PWM_Init(void)
     Macro_Clear_Bit(TIM2->SR, 0U);
     Macro_Set_Bit(TIM2->CR1, 0U);                 // CEN = 1
 }
-
 ```
 
 ---
@@ -96,7 +94,6 @@ $$ADC = \frac{1.02\text{V}}{\mathbf{2.75\text{V}}} \times 4095 \approx \mathbf{1
 ```text
 [전원 안정] V_ref: 3.3V ───> ADC: 1270 (정상)
 [부하 발생] V_ref: 2.75V ──> ADC: 1520 (기준 전압 강하로 수치 왜곡 발생)
-
 ```
 
 ### 2.3 해결 및 대응 전략
@@ -157,7 +154,6 @@ static void Valve_Set_State(unsigned char state)
     Motor_Display(state); // DC 팬 가동/정지
     Servo_Display(state); // 서보 모터 90도/0도 이동
 }
-
 ```
 
 * **효과**: 불필요한 하드웨어 I/O 및 타이머 레지스터 쓰기를 $100\%$ 차단하고, 다중 입력 환경(물리 스위치, UART 명령, 자동 차단)에서의 상태 무결성을 확보함.
@@ -200,7 +196,6 @@ void MainWindow::updatePortList()
         ui->cbPortList->setCurrentIndex(idx);
     }
 }
-
 ```
 
 * **효과**: 포트 리스트를 안전하게 동적 갱신하면서도 불필요한 이벤트 전파를 완벽히 억제함.
@@ -266,7 +261,6 @@ void TcpStreamServer::onReadyRead()
         m_imageSize = 0;
     }
 }
-
 ```
 
 ---
@@ -292,7 +286,6 @@ public:
     explicit SettingsManager(const QString& filePath);
     // ...
 };
-
 ```
 
 * **효과**: `MainWindow`가 구체적인 설정 파일명(`config.ini`)을 알 필요가 없어 결합도(Coupling)가 낮아지고, 모든 컴파일러 및 IDE 정적 분석기에서 경고 없이 완벽히 빌드됨.

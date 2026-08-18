@@ -44,7 +44,6 @@ graph TB
 
     A3 <--"TCP/IP (WiFi: 8080)\nVideo Stream & Commands"--> G1
     G3 <--"UART (115200 8N1)\nADC Data & Actuator Cmds"--> E3
-
 ```
 
 ---
@@ -54,36 +53,10 @@ graph TB
 ### 2.1 계층별 책임 분담 원칙 (Separation of Concerns)
 
 | 계층 | 주 책임 (Responsibilities) | 비책임 (Out of Scope) |
-| --- | --- | --- |
-| **STM32 펌웨어**<br>
-
-<br>(Edge Node) | • 주기적 12비트 아날로그 가스 센서 계측<br>
-
-<br>• 물리 액추에이터(서보 밸브, DC 팬, LED) 직접 구동<br>
-
-<br>• 하드웨어 레지스터 제어 및 중복 실행 방지(인터록) | • 임계값 판정 로직<br>
-
-<br>• 데이터 영속화(파일 저장)<br>
-
-<br>• 영상 처리 |
-| **Qt 서버**<br>
-
-<br>(Gateway) | • 이종 매체(UART ↔ TCP) 간 패킷 중계 및 변환<br>
-
-<br>• 가스 수치 위험 판정 및 단일 트리거 자동 차단 제어<br>
-
-<br>• 실시간 시계열 그래프 렌더링 및 CSV 데이터 로깅 | • 물리 신호 직접 생성<br>
-
-<br>• 영상 캡처(촬영) |
-| **Android 앱**<br>
-
-<br>(Client) | • CameraX 기반 영상 캡처 및 JPEG 압축 송신<br>
-
-<br>• 실시간 가스 텔레메트리(`GAS:val:threshold`) 표시<br>
-
-<br>• 관제자 수동 원격 제어 명령 송신 | • 가스 위험 판단<br>
-
-<br>• 밸브 자동 차단 결정 |
+| :--- | :--- | :--- |
+| **STM32 펌웨어** (Edge Node) | • 주기적 12비트 아날로그 가스 센서 계측<br>• 물리 액추에이터(서보 밸브, DC 팬, LED) 직접 구동<br>• 하드웨어 레지스터 제어 및 중복 실행 방지(인터록) | • 임계값 판정 로직<br>• 데이터 영속화(파일 저장)<br>• 영상 처리 |
+| **Qt 서버** (Gateway) | • 이종 매체(UART ↔ TCP) 간 패킷 중계 및 변환<br>• 가스 수치 위험 판정 및 단일 트리거 자동 차단 제어<br>• 실시간 시계열 그래프 렌더링 및 CSV 데이터 로깅 | • 물리 신호 직접 생성<br>• 영상 캡처(촬영) |
+| **Android 앱** (Client) | • CameraX 기반 영상 캡처 및 JPEG 압축 송신<br>• 실시간 가스 텔레메트리(`GAS:val:threshold`) 표시<br>• 관제자 수동 원격 제어 명령 송신 | • 가스 위험 판단<br>• 밸브 자동 차단 결정 |
 
 ---
 
@@ -129,7 +102,6 @@ classDiagram
     MainWindow *-- SerialManager
     MainWindow *-- TcpStreamServer
     MainWindow *-- ChartManager
-
 ```
 
 ---
@@ -156,7 +128,6 @@ sequenceDiagram
         Qt->>Android: TCP "GAS:<ADC_VALUE>:<THRESHOLD>\n"
         Android->>Android: StateFlow 갱신 및 UI 대시보드 리렌더링
     end
-
 ```
 
 ---
@@ -172,7 +143,6 @@ flowchart LR
     C3 -- "TCP/IP Port 8080" --> Q1["TcpStreamServer\n길이 헤더 파싱 &\n버퍼 프레임 재조립"]
     Q1 --> Q2["QPixmap::loadFromData\n디코딩"]
     Q2 --> Q3["MainWindow\nQLabel CCTV 뷰\n비율 유지 스케일링"]
-
 ```
 
 ---
@@ -205,7 +175,6 @@ sequenceDiagram
     else 동일 상태 중복 수신
         STM->>STM: 무시 (하드웨어 레지스터 보호)
     end
-
 ```
 
 ---
@@ -244,7 +213,6 @@ stateDiagram-v2
 
     DANGER_TRIGGERED --> MANUAL_RECOVERY : 관제자 수동 복구 ('0' 송신)
     MANUAL_RECOVERY --> NORMAL_MONITORING : ADC < 임계값 정상 회복
-
 ```
 
 ---
@@ -287,7 +255,6 @@ flowchart TD
         S1["TIM4 1ms SysTick Interrupt"] -->|100ms Flag Set| S2["Main Loop (Polling & Output)"]
         S3["USART2 RX Interrupt"] -->|Single Byte Buffer| S2
     end
-
 ```
 
 * **STM32 (ISR 최소화)**: 인터럽트 서비스 루틴(ISR)에서는 계측 플래그와 수신 버퍼만 빠르게 갱신하고, 실제 ADC 변환 및 UART 송신은 메인 루프에서 처리하여 인터럽트 지연(Latency)을 최소화합니다.
@@ -296,34 +263,44 @@ flowchart TD
 
 ---
 
-## 6. 하드웨어/네트워크 토폴로지
+## 6. 네트워크 토폴로지 및 접속 모드
+
+본 시스템은 현장 상황과 운용 환경에 따라 **2가지 네트워크 모드(로컬 LAN / 원격 Tailscale VPN)**를 유연하게 지원합니다.
+
+### 6.1 지원 네트워크 모드
+
+1. **로컬 핫스팟 / Wi-Fi 모드 (Local LAN)**
+   * PC 핫스팟(`192.168.137.1`)에 안드로이드 폰이 직접 접속하는 내부망 환경
+   * 공유기나 외부 인터넷 연결 없이도 단독 운용 가능 (현장 즉시 설치)
+2. **Tailscale 오버레이 VPN 모드 (Remote Mesh Network - 권장 ⭐)**
+   * Tailscale(WireGuard 기반) 가상 사설망(`100.64.0.0/10` 대역)을 적용
+   * 스마트폰이 외부 LTE/5G 환경에 있더라도 복잡한 포트포워딩(DDNS)이나 공인 IP 설정 없이 안전하게 NAT를 통과(NAT Traversal)하여 PC 관제 서버(`100.72.78.11`)로 1:1 암호화 스트리밍
+
+---
+
+### 6.2 종합 통신 구성도
 
 ```text
-+---------------------------------------------------------------+
-|                    Mobile Hotspot (WiFi LAN)                 |
-|                      SSID: Monitoring_AP                      |
-+-------------------------------+-------------------------------+
-                                |
-        +-----------------------+-----------------------+
-        |                                               |
-+-------v-----------------------+       +---------------v---------------+
-|     Android Smartphone        |       |        Desktop PC (Qt)        |
-|  IP: 192.168.137.xxx (DHCP)   |       |  IP: 192.168.137.1 (Static)   |
-|  Role: Video Source / Client  |       |  Role: Gateway / TCP Server   |
-+-------------------------------+       +---------------+---------------+
-                                                        |
-                                            USB VCP (UART 115200 8N1)
-                                                        |
-                                        +---------------v---------------+
-                                        |      STM32F411RE Nucleo       |
-                                        |  Role: Sensor / Actuator Node |
-                                        +---------------+---------------+
-                                                        |
-                               +------------------------+------------------------+
-                               |                        |                        |
-                       +-------v-------+        +-------v-------+        +-------v-------+
-                       | Gas Sensor    |        | SG90 Servo    |        | DC Fan / LED  |
-                       | (ADC1_IN6)    |        | (TIM2_CH1)    |        | (GPIO Out)    |
-                       +---------------+        +---------------+        +---------------+
+[모드 1: 로컬 핫스팟]                         [모드 2: Tailscale 원격 오버레이 VPN]
+Desktop PC (Hotspot AP)                       Desktop PC (Tailscale Node: 100.72.78.11)
+  IP: 192.168.137.1 (Gateway)                   ▲
+        ▲                                       │ Encrypted P2P Tunnel (WireGuard)
+        │ Local Wi-Fi (TCP 8080)                │ (NAT Traversal / Anywhere over LTE/5G)
+        ▼                                       ▼
+Android Client (192.168.137.xxx)              Android Client (Tailscale Node: 100.xxx.xxx.xxx)
 
-```
+                                ┌───────────────────────┐
+                                │      Desktop PC       │
+                                │  (Qt Gateway Server)  │
+                                └───────────┬───────────┘
+                                            │ USB VCP (UART 115200 8N1)
+                                            ▼
+                                ┌───────────────────────┐
+                                │  STM32F411RE Nucleo   │
+                                │  (Edge Sensing Node)  │
+                                └───────────┬───────────┘
+                                            │
+                        ┌───────────────────┼───────────────────┐
+                        ▼                   ▼                   ▼
+                 [ Gas Sensor ]       [ SG90 Servo ]      [ DC Fan / LED ]
+                   (ADC1_IN6)           (TIM2_CH1)          (GPIO Out)
