@@ -29,7 +29,7 @@
 본 프로젝트는 밀폐 공간 및 산업 현장에서 발생할 수 있는 가스 누출 위험을 실시간으로 감지하고, **위험 상황 시 물리 밸브 차단, 강제 환기, 시각 경보를 자율적/원격으로 동시 수행**하는 3계층 스마트 안전 관제 시스템입니다.
 
 <div align="center">
-  <img src="images/hardware_setup.jpg" width="85%" alt="전체 시스템 하드웨어 셋업" />
+  <img src="images/hardware_setup.png" width="85%" alt="전체 시스템 하드웨어 셋업" />
   <p><b>[그림 1] STM32F411RE 엣지 노드 및 액추에이터 구동 하드웨어 셋업</b></p>
 </div>
 
