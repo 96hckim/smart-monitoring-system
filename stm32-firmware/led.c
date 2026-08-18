@@ -1,6 +1,7 @@
 #include "led.h"
+#include "macro.h"
 
-void Barrier_LED_Init(void)
+void LED_Init(void)
 {
 	// GPIOB 클럭 활성화 (AHB1ENR Bit 1)
 	Macro_Set_Bit(RCC->AHB1ENR, 1);
@@ -18,30 +19,30 @@ void Barrier_LED_Init(void)
 	Macro_Clear_Bit(GPIOB->ODR, 1);
 }
 
-void Barrier_LED_On(void)
+void LED_On(void)
 {
 	Macro_Set_Bit(GPIOB->ODR, 0);
 	Macro_Set_Bit(GPIOB->ODR, 1);
 }
 
-void Barrier_LED_Off(void)
+void LED_Off(void)
 {
 	Macro_Clear_Bit(GPIOB->ODR, 0);
 	Macro_Clear_Bit(GPIOB->ODR, 1);
 }
 
-void Barrier_LED_Display(int on)
+void LED_Display(int on)
 {
 	// PB0, PB1 비트 블록 동시 제어 (1: 11b 점등, 0: 00b 소등)
 	Macro_Write_Block(GPIOB->ODR, 0x3, on ? 0x3 : 0x0, 0);
 }
 
-void Barrier_LED_Top(int on)
+void LED_Top(int on)
 {
 	Macro_Write_Block(GPIOB->ODR, 0x1, on & 0x1, 0);
 }
 
-void Barrier_LED_Bottom(int on)
+void LED_Bottom(int on)
 {
 	Macro_Write_Block(GPIOB->ODR, 0x1, on & 0x1, 1);
 }

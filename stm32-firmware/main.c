@@ -4,6 +4,7 @@
 #include "led.h"
 #include "motor.h"
 #include "key.h"
+#include "servo.h"
 #include <stdio.h>
 
 extern volatile unsigned long g_sys_tick;
@@ -12,12 +13,18 @@ extern volatile unsigned char g_rx_flag; // 명령 수신 플래그
 
 static unsigned char g_valve_state = 0; // 밸브 상태 (1: 차단/환기, 0: 정상/개방)
 
-// 밸브 상태 변경 및 하드웨어 액추에이터(LED + 모터) 동기화
+// 밸브 상태 변경 및 모든 액추에이터(LED + DC모터 + 서보모터) 일괄 동기화
 static void Valve_Set_State(unsigned char state)
 {
+    if (g_valve_state == state)
+    {
+        return;
+    }
+
     g_valve_state = state;
-    Barrier_LED_Display(state);
-    Motor_Display(state);
+    LED_Display(state);   // 경보 LED 제어
+    Motor_Display(state); // 환기 팬(DC 모터) 제어
+    Servo_Display(state); // 물리 밸브(서보 모터 90°/0°) 제어
 }
 
 // 수신된 Qt 명령어 디코딩 처리
@@ -52,15 +59,16 @@ void Main(void)
     Sys_Init(115200);
     printf("\n=== Smart Monitoring System ===\n");
 
-    TIM4_Init();
+    Timer_Init();
     ADC1_Init();
-    Barrier_LED_Init();
+    LED_Init();
     Motor_Init();
     Key_Init();
+    Servo_Init();
 
     Uart2_RX_Interrupt_Enable(1);
 
-    // 초기 상태: 정상 개방 (LED 소등, 모터 정지)
+    // 초기 상태: 정상 개방 (LED 소등, 팬 정지, 밸브 0도 개방)
     Valve_Set_State(0);
 
     printf("System Ready!\n");
