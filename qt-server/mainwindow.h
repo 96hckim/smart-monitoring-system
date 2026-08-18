@@ -1,7 +1,17 @@
 ﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "chartmanager.h"
+#include "logger.h"
+#include "serialmanager.h"
+#include "settingsmanager.h"
+#include "tcpstreamserver.h"
+
+#include <QCloseEvent>
+#include <QEvent>
 #include <QMainWindow>
+#include <QPixmap>
+#include <QString>
 #include <memory>
 
 QT_BEGIN_NAMESPACE
@@ -9,13 +19,6 @@ namespace Ui {
 class MainWindow;
 }
 QT_END_NAMESPACE
-
-class TcpStreamServer;
-class SerialManager;
-class ChartManager;
-class SettingsManager;
-class QCloseEvent;
-class QEvent;
 
 /**
  * @brief 스마트 모니터링 시스템의 메인 GUI 컨트롤러

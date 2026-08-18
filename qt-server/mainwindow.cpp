@@ -1,16 +1,9 @@
 ﻿#include "mainwindow.h"
-#include "chartmanager.h"
-#include "logger.h"
-#include "serialmanager.h"
-#include "settingsmanager.h"
-#include "tcpstreamserver.h"
 #include "ui_mainwindow.h"
 
-#include <QCloseEvent>
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
-#include <QEvent>
 #include <QFile>
 #include <QFileDialog>
 #include <QNetworkInterface>
